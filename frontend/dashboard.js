@@ -22,7 +22,7 @@ function showToast(message, type = 'success') {
 // 1. Authentication Check
 const token = localStorage.getItem('artifauctor_token');
 if (!token) {
-    window.location.href = 'auth.html';
+    window.location.href = 'error.html?code=401';
 }
 
 async function fetchWithAuth(url, options = {}) {
@@ -90,6 +90,19 @@ async function loadHistory() {
         }
 
         grid.innerHTML = articles.map(article => {
+            // --- DYNAMIC BADGE LOGIC ---
+            let displayStatus = article.status;
+            let badgeClass = 'badge-draft';
+
+            if (article.status === 'Published') {
+                badgeClass = 'badge-published';
+            } else if (article.status === 'Stale') {
+                badgeClass = 'badge-stale';
+            } else if (article.status === 'Draft' && article.scheduled_for) {
+                badgeClass = 'badge-scheduled';
+                displayStatus = 'Scheduled';
+            }
+
             // --- INDEPENDENT PLATFORM BUTTONS ---
             let actionsHtml = `<div class="flex gap-2 mt-4">`;
             
@@ -109,12 +122,18 @@ async function loadHistory() {
             
             actionsHtml += `</div>`;
 
+            // Display schedule time if it exists and is still a draft
+            let scheduleInfo = '';
+            if (displayStatus === 'Scheduled' && article.scheduled_for) {
+                scheduleInfo = `<p class="text-[10px] mt-2 font-black text-purple-600 uppercase tracking-widest">FOR: ${new Date(article.scheduled_for).toLocaleString()}</p>`;
+            }
+
             return `
                 <div class="brutalist-card p-6 rounded-xl flex flex-col justify-between">
                     <div>
                         <div class="flex justify-between items-start mb-4">
-                            <span class="px-3 py-1 text-xs font-black uppercase rounded mono ${article.status === 'Published' ? 'badge-published' : 'badge-draft'}">
-                                ${article.status}
+                            <span class="px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded mono ${badgeClass}">
+                                ${displayStatus}
                             </span>
                             <span class="text-xs font-bold text-gray-500 mono">${new Date(article.created_at).toLocaleDateString()}</span>
                         </div>
@@ -122,6 +141,7 @@ async function loadHistory() {
                             ${article.keyword}
                         </h3>
                         <p class="text-sm font-bold text-gray-600 uppercase mb-0">Domain: ${article.domain}</p>
+                        ${scheduleInfo}
                     </div>
                     
                     ${actionsHtml}
@@ -144,7 +164,7 @@ window.deployFromVault = async function(articleId, platform) {
         
         if (response.ok) {
             showToast('Deployment successful!', 'success');
-            loadHistory(); // Reload grid to change buttons to "View" badges
+            loadHistory(); // Reload grid to update badges and "Kill Switch" the schedule
         } else {
             const err = await response.json();
             showToast(err.detail || 'Deployment failed. Check API keys.', 'error');

@@ -12,7 +12,7 @@ from auth_utils import get_current_user
 # Your existing services
 from services.serp_scraper import fetch_top_serp_results
 from services.agents import generate_seo_blog, generate_socials
-from services.validator import calculate_seo_metrics
+from services.validator import calculate_seo_score, calculate_humanness_score
 from services.publisher import publish_to_devto, publish_to_hashnode
 
 router = APIRouter()
@@ -35,8 +35,7 @@ async def generate_blog_endpoint(
         )
 
     try:
-        # --- NEW: RAG-LITE INTERNAL LINKING LOOKUP ---
-        # Fetch up to 5 previously published articles to pass to the Writer Agent
+        # --- RAG-LITE INTERNAL LINKING LOOKUP ---
         previous_articles = db.query(db_models.ArticleHistory).filter(
             db_models.ArticleHistory.user_id == current_user.id,
             db_models.ArticleHistory.status == "Published"
@@ -44,11 +43,11 @@ async def generate_blog_endpoint(
 
         links_for_ai = []
         for art in previous_articles:
-            # Use whichever URL is available (Independent columns)
+            # Use whichever URL is available
             url = art.devto_url or art.hashnode_url
-            if url:
-                links_for_ai.append({"keyword": art.keyword, "url": url})
-        # CRITICAL: Log this so you can see it in your terminal
+            if url and url.strip():
+                links_for_ai.append({"keyword": art.keyword, "url": url.strip()})
+                
         print(f"DEBUG: Found {len(links_for_ai)} links for AI context: {links_for_ai}")
 
         # 2. THE EYES: Competitive SERP Research
@@ -56,54 +55,66 @@ async def generate_blog_endpoint(
         if not serp_data:
             raise HTTPException(status_code=500, detail="SERP Scraping Failed.")
             
-        # 3. THE BRAIN: Enhanced Generation (Now with Internal Links)
+        # 3. THE BRAIN: Enhanced Generation
         ai_result = generate_seo_blog(
             keyword=request.keyword, 
             serp_data=serp_data, 
             domain=request.domain,
             api_key=current_user.gemini_key,
             brand_voice=current_user.brand_voice,
-            previous_links=links_for_ai # <-- Injected here
+            previous_links=links_for_ai
         )
         if not ai_result:
             raise HTTPException(status_code=500, detail="AI Generation Failed.")
 
-        # --- NEW: AGENT 4 - SOCIAL MEDIA SPINOFFS ---
-        # Generate viral copy based on the fresh blog content
+        # --- AGENT 4 - SOCIAL MEDIA SPINOFFS ---
         socials = generate_socials(ai_result["blog_content"], current_user.gemini_key)
             
-        # 4. THE JUDGE: SEO Metrics
-        metrics = calculate_seo_metrics(request.keyword, ai_result["blog_content"], request.domain)
-        logging.info(f"PIPELINE COMPLETE: SEO Score {metrics['seo_score']}/100")
+        # -----------------------------------------------------
+        # 4. THE JUDGE: ML HYBRID VALIDATOR
+        # -----------------------------------------------------
+        logging.info("Running ML Validator & Perplexity Check...")
+        seo_score = calculate_seo_score(ai_result["blog_content"], request.keyword, request.domain)
+        humanness_data = calculate_humanness_score(ai_result["blog_content"])
+        
+        naturalness_score = humanness_data["naturalness"]
+        readability_level = humanness_data["readability"]
+        
+        # Simple heuristic for snippets
+        snippet_readiness = "High" if "<h2>" in ai_result["blog_content"] and "<ul>" in ai_result["blog_content"] else "Low"
+        
+        logging.info(f"PIPELINE COMPLETE: SEO Score {seo_score}/100 | Humanness: {naturalness_score}%")
 
-        # 5. THE VAULT: Save with Socials
+        # 5. THE VAULT: Save with Socials & Scheduler
         new_article = db_models.ArticleHistory(
             user_id=current_user.id,
             keyword=request.keyword,
             domain=request.domain,
             content=ai_result["blog_content"],
-            seo_score=float(metrics["seo_score"]),
+            seo_score=float(seo_score),
             status="Draft",
-            twitter_thread=socials.get("twitter"), # <-- New Column
-            linkedin_post=socials.get("linkedin")   # <-- New Column
+            twitter_thread=socials.get("twitter"),
+            linkedin_post=socials.get("linkedin"),
+            scheduled_for=request.scheduled_for  # <-- THE SCHEDULER ACTIVATION
         )
         db.add(new_article)
         db.commit()
         db.refresh(new_article)
 
-        # 6. Return Data (Make sure your BlogResponse schema includes twitter/linkedin!)
+        # 6. Return Data exactly as the UI expects it
         return schemas.BlogResponse(
             keyword=request.keyword,
             domain=request.domain,
             outline=ai_result["outline"],
             blog_content=ai_result["blog_content"],
-            seo_score=metrics["seo_score"],
-            twitter_thread=socials.get("twitter"), # Pass to UI
-            linkedin_post=socials.get("linkedin"), # Pass to UI
-            keyword_density=metrics["keyword_density"],
-            naturalness=metrics["naturalness"],
-            snippet_readiness=metrics["snippet_readiness"],
-            readability_level=metrics["readability_level"]
+            seo_score=seo_score,                     # From ML Model
+            naturalness=naturalness_score,           # From Textstat Variance
+            readability_level=readability_level,     # From Flesch Check
+            snippet_readiness=snippet_readiness,     # From Heuristics
+            twitter_thread=socials.get("twitter"), 
+            linkedin_post=socials.get("linkedin"),
+            # Ensure keyword_density is in your schema, or default it to 0 since we use naturalness now
+            keyword_density=0  
         )
         
     except Exception as e:
@@ -137,6 +148,7 @@ async def publish_devto_route(
     if article:
         article.status = "Published"
         article.devto_url = url # <-- Save specifically to Dev.to
+        article.scheduled_for = None
         db.commit()
 
     return {"url": url}
@@ -165,6 +177,7 @@ async def publish_hashnode_route(
     if article:
         article.status = "Published"
         article.hashnode_url = url # <-- Save specifically to Hashnode
+        article.scheduled_for = None
         db.commit()
 
     return {"url": url}
@@ -215,6 +228,8 @@ async def publish_from_vault(
             article.devto_url = url
         elif platform == "hashnode":
             article.hashnode_url = url
+
+        article.scheduled_for = None
             
         db.commit()
 

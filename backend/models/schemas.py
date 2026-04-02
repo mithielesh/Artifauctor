@@ -6,6 +6,7 @@ class BlogRequest(BaseModel):
     keyword: str
     domain: str = "General"
     auto_publish: bool = False  # The frontend will toggle this to True when you click "Deploy"
+    scheduled_for: Optional[datetime] = None
 
 class BlogResponse(BaseModel):
     keyword: str
@@ -13,7 +14,10 @@ class BlogResponse(BaseModel):
     outline: str
     blog_content: str
     seo_score: int
-    keyword_density: float
+
+    # We default this to 0.0 because the ML Engine now uses 'naturalness' instead!
+    keyword_density: Optional[float] = 0.0 
+    
     twitter_thread: Optional[str] = None
     linkedin_post: Optional[str] = None
     naturalness: int
@@ -62,6 +66,7 @@ class ArticleHistoryResponse(BaseModel):
     keyword: str
     domain: str
     status: str
+    scheduled_for: Optional[datetime] = None
     seo_score: Optional[float] = None
     devto_url: Optional[str] = None
     hashnode_url: Optional[str] = None

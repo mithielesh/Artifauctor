@@ -3,7 +3,7 @@ const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
 // --- 1. Security Gate (The Bouncer) ---
 const token = localStorage.getItem('artifauctor_token');
 if (!token) {
-    window.location.href = 'auth.html';
+    window.location.href = 'error.html?code=401';
 }
 
 // Global state for HITL deployment
@@ -66,8 +66,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const keyword = keywordInput.value.trim();
         const domainSelect = document.getElementById('domainSelect');
         const autoPublishToggle = document.getElementById('autoPublish');
+        const scheduleInput = document.getElementById('scheduleInput'); // <-- New Date Capture
+        
         const domain = domainSelect ? domainSelect.value : "General";
         const autoPublish = autoPublishToggle ? autoPublishToggle.checked : false;
+        const scheduledFor = scheduleInput && scheduleInput.value ? scheduleInput.value : null; // <-- Value check
         
         const loadingState = document.getElementById('loadingState');
         const loadingText = document.getElementById('loadingText');
@@ -109,7 +112,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}` 
                 },
-                body: JSON.stringify({ keyword, domain })
+                // Pass scheduled_for to the backend
+                body: JSON.stringify({ 
+                    keyword: keyword, 
+                    domain: domain,
+                    scheduled_for: scheduledFor 
+                })
             });
 
             if (response.status === 401) {
@@ -141,25 +149,39 @@ document.addEventListener('DOMContentLoaded', () => {
                     : "metric-value text-yellow-600 font-bold";
             }
 
-            // --- NEW: SOCIAL MEDIA SPINOFF RENDERING ---
+            // --- SOCIAL MEDIA SPINOFF RENDERING ---
             if (data.twitter_thread && data.linkedin_post) {
                 document.getElementById('twitter-text').innerText = data.twitter_thread;
                 document.getElementById('linkedin-text').innerText = data.linkedin_post;
-    
-                // Show the Promo Trigger (The big Indigo card)
-                document.getElementById('social-container').classList.remove('hidden');
+                
+                // Show the Promo Trigger, hide the cards initially
+                const promoTrigger = document.getElementById('promo-trigger');
+                const promoCards = document.getElementById('promo-cards');
+                if(promoTrigger) promoTrigger.classList.remove('hidden');
+                if(promoCards) promoCards.classList.add('hidden');
+
+                if(socialContainer) socialContainer.classList.remove('hidden');
             }
 
             // Transition UI
             clearInterval(messageInterval);
-            loadingState.classList.add('hidden');
-            resultsSection.classList.remove('hidden');
+            if(loadingState) loadingState.classList.add('hidden');
+            if(resultsSection) resultsSection.classList.remove('hidden');
             
-            showToast('Pipeline execution complete. Artifact saved to Vault.', 'success');
-
-            if (autoPublish && stagingArea) {
-                stagingArea.classList.remove('hidden');
-                resetPublishCards();
+            // --- NEW: SCHEDULED VS AUTO-PUBLISH UX ---
+            if (scheduledFor) {
+                const dateStr = new Date(scheduledFor).toLocaleString();
+                showToast(`Artifact Saved and SCHEDULED for ${dateStr}`, 'success');
+                if (stagingArea) {
+                    stagingArea.classList.remove('hidden');
+                    resetPublishCards("SCHEDULED"); // Triggers the Purple Badge
+                }
+            } else {
+                showToast('Pipeline execution complete. Artifact saved to Vault.', 'success');
+                if (autoPublish && stagingArea) {
+                    stagingArea.classList.remove('hidden');
+                    resetPublishCards("AWAITING"); // Triggers the Yellow Badge
+                }
             }
 
         } catch (error) {
@@ -180,7 +202,7 @@ window.approvePublish = async function(platform) {
     if (!statusEl || !linkEl) return;
 
     statusEl.textContent = "DEPLOYING...";
-    statusEl.className = "text-[9px] bg-blue-100 px-2 py-1 border border-blue-500 font-black animate-pulse";
+    statusEl.className = "text-[9px] bg-blue-100 px-2 py-1 border border-blue-500 font-black animate-pulse uppercase tracking-widest";
 
     try {
         const response = await fetch(`${API_BASE_URL}/publish/${platform}`, {
@@ -198,7 +220,7 @@ window.approvePublish = async function(platform) {
         const result = await response.json();
         if (result.url) {
             statusEl.textContent = "LIVE";
-            statusEl.className = "text-[9px] bg-green-100 px-2 py-1 border border-green-500 font-black text-green-700";
+            statusEl.className = "text-[9px] bg-green-100 px-2 py-1 border border-green-500 font-black text-green-700 tracking-widest uppercase";
             linkEl.classList.remove('hidden');
             linkEl.innerHTML = `<a href="${result.url}" target="_blank" class="hover:underline font-bold text-indigo-700">View Live Deployment →</a>`;
             showToast(`${platform.toUpperCase()} Deployment Successful!`, 'success');
@@ -207,7 +229,7 @@ window.approvePublish = async function(platform) {
         }
     } catch (e) {
         statusEl.textContent = "FAILED";
-        statusEl.className = "text-[9px] bg-red-100 px-2 py-1 border border-red-500 font-black text-red-700";
+        statusEl.className = "text-[9px] bg-red-100 px-2 py-1 border border-red-500 font-black text-red-700 tracking-widest uppercase";
         showToast(`${platform.toUpperCase()} Deployment Failed. Check API Keys.`, 'error');
     }
 }
@@ -216,18 +238,28 @@ window.rejectPublish = function(platform) {
     const statusEl = document.getElementById(`${platform}Status`);
     if (statusEl) {
         statusEl.textContent = "REJECTED";
-        statusEl.className = "text-[9px] bg-gray-100 px-2 py-1 border border-gray-400 font-black text-gray-500";
+        statusEl.className = "text-[9px] bg-gray-100 px-2 py-1 border border-gray-400 font-black text-gray-500 tracking-widest uppercase";
     }
 }
 
-window.resetPublishCards = function() {
+// --- Dynamic Badge Generator ---
+window.resetPublishCards = function(initialState = "AWAITING") {
     ['devto', 'hashnode'].forEach(platform => {
         const statusEl = document.getElementById(`${platform}Status`);
         const linkEl = document.getElementById(`${platform}Link`);
+        
         if (statusEl) {
-            statusEl.textContent = "AWAITING";
-            statusEl.className = "text-[9px] bg-yellow-100 px-2 py-1 border border-black font-black";
+            statusEl.textContent = initialState;
+            
+            if (initialState === "SCHEDULED") {
+                // Time-Travel Theme
+                statusEl.className = "text-[9px] bg-purple-100 px-2 py-1 border border-purple-500 font-black text-purple-700 tracking-widest uppercase";
+            } else {
+                // Default Theme
+                statusEl.className = "text-[9px] bg-yellow-100 px-2 py-1 border border-black font-black text-yellow-800 tracking-widest uppercase";
+            }
         }
+        
         if (linkEl) {
             linkEl.classList.add('hidden');
             linkEl.innerHTML = '';
@@ -235,25 +267,41 @@ window.resetPublishCards = function() {
     });
 }
 
-window.copySocial = function(elementId) {
+// --- Updated Copy Function ---
+window.copySocial = function(elementId, e) { // <-- Added 'e' here
     const text = document.getElementById(elementId).innerText;
+    
     navigator.clipboard.writeText(text).then(() => {
         showToast("Copied to clipboard!", "success");
+        
+        // Use the passed event 'e' instead of the global 'event'
+        if(e && e.target) {
+            const btn = e.target;
+            const originalText = btn.innerText;
+            btn.innerText = "COPIED";
+            
+            // Revert the text after 2 seconds
+            setTimeout(() => {
+                btn.innerText = originalText;
+            }, 2000);
+        }
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+        showToast("Copy failed!", "error");
     });
 }
 
-// social and scheduling helpers
+// Social Promo Helpers
 window.revealSocialCards = function() {
     const trigger = document.getElementById('promo-trigger');
     const cards = document.getElementById('promo-cards');
     
-    // Hide the compact trigger, show the bold cards
-    trigger.classList.add('hidden');
-    cards.classList.remove('hidden');
-    cards.classList.add('grid'); // Ensure grid layout is active
-    
-    // Smooth scroll to the cards so they are perfectly aligned in the view
-    cards.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if(trigger) trigger.classList.add('hidden');
+    if(cards) {
+        cards.classList.remove('hidden');
+        cards.classList.add('grid');
+        cards.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 }
 
 window.logoutUser = function() {

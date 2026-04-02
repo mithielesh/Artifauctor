@@ -154,18 +154,18 @@
                 </div>
             </div>
 
-            <div class="flex flex-col lg:flex-row gap-5 items-end">
+            <div class="flex flex-col xl:flex-row gap-5 items-end">
                 <div class="flex-1 w-full">
                     <label class="metric-label mb-2 block">Target Keyword</label>
-                    <div class="input-box flex">
+                    <div class="input-box flex h-[56px]">
                         <input type="text" id="keywordInput" placeholder="e.g. LLM Orchestration in Fintech" 
-                            class="w-full p-4 outline-none mono text-sm bg-transparent">
+                            class="w-full px-4 outline-none mono text-sm bg-transparent">
                     </div>
                 </div>
                 
-                <div class="w-full lg:w-48">
+                <div class="w-full xl:w-48">
                     <label class="metric-label mb-2 block">Industry Domain</label>
-                    <select id="domainSelect" class="w-full p-4 input-box mono text-sm outline-none">
+                    <select id="domainSelect" class="w-full px-4 h-[56px] input-box mono text-sm outline-none bg-white">
                         <option value="Technical">Technical</option>
                         <option value="B2B SaaS">B2B SaaS</option>
                         <option value="Finance">Finance</option>
@@ -173,12 +173,21 @@
                     </select>
                 </div>
 
-                <div class="flex items-center gap-3 px-5 py-4 input-box bg-gray-50">
-                    <input type="checkbox" id="autoPublish" class="w-5 h-5 accent-indigo-500 cursor-pointer">
-                    <label for="autoPublish" class="metric-label whitespace-nowrap cursor-pointer">Auto-Deploy</label>
+                <div class="flex flex-col sm:flex-row gap-4 items-end">
+                    <div class="w-full sm:w-auto">
+                        <label class="metric-label mb-2 block">Schedule For (Optional)</label>
+                        <div class="input-box flex bg-gray-50 h-[56px] items-center">
+                            <input type="datetime-local" id="scheduleInput" class="w-full px-4 outline-none mono text-xs bg-transparent text-gray-700">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3 px-5 h-[56px] input-box bg-gray-50 w-full sm:w-auto">
+                        <input type="checkbox" id="autoPublish" class="w-5 h-5 accent-indigo-500 cursor-pointer">
+                        <label for="autoPublish" class="metric-label whitespace-nowrap cursor-pointer mb-0">Auto-Deploy</label>
+                    </div>
                 </div>
 
-                <button id="generateBtn" onclick="runPipeline()" class="btn-primary px-10 py-4 text-sm">
+                <button id="generateBtn" class="btn-primary px-10 h-[56px] text-sm whitespace-nowrap">
                     Run Pipeline
                 </button>
             </div>
@@ -240,44 +249,43 @@
             <div class="p-12">
                 <div id="blogOutput" class="prose bg-white p-10 border-2 border-dark shadow-[4px_4px_0px_#1f2937]"></div>
             </div>
-        </div>
-        <div id="social-container" class="hidden mt-12 mb-16 p-10 bg-gray-50 border-t-2 border-dashed border-gray-300">
-    
-            <div id="promo-trigger" class="input-box p-6 grid grid-cols-1 lg:grid-cols-[1fr,auto] items-center gap-6 bg-white transition-all">
-                <div>
-            <h3 class="text-2xl font-bold tracking-tight text-gray-900">Do you want to let your followers know you've posted a blog?</h3>
-            <p class="text-xs text-gray-500 mono uppercase tracking-widest mt-1">Select platforms to generate announcement hooks</p>
-        </div>
-        <button onclick="revealSocialCards()" class="btn-primary !py-4 px-10 text-xs">
-            Generate Promo Posts
-        </button>
-    </div>
-
-    <div id="promo-cards" class="hidden mt-10 grid grid-cols-1 md:grid-cols-2 gap-10 animate-fade-in">
-        
-        <div class="bg-white p-8 border-2 border-dark shadow-[4px_4px_0px_#1f2937]">
-            <div class="flex justify-between items-center mb-6 pb-2 border-b-2 border-gray-100">
-                <div class="flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 bg-blue-400 border border-black rounded-full !important"></span>
-                    <span class="metric-label !text-[11px] text-blue-700">X Hook</span>
+            
+            <div id="social-container" class="hidden mt-12 mb-16 p-10 bg-gray-50 border-t-2 border-dashed border-gray-300">
+                <div id="promo-trigger" class="input-box p-6 grid grid-cols-1 lg:grid-cols-[1fr,auto] items-center gap-6 bg-white transition-all">
+                    <div>
+                        <h3 class="text-2xl font-bold tracking-tight text-gray-900">Do you want to let your followers know you've posted a blog?</h3>
+                        <p class="text-xs text-gray-500 mono uppercase tracking-widest mt-1">Select platforms to generate announcement hooks</p>
+                    </div>
+                    <button onclick="revealSocialCards()" class="btn-primary !py-4 px-10 text-xs">
+                        Generate Promo Posts
+                    </button>
                 </div>
-                <button onclick="copySocial('twitter-text')" class="btn-primary !bg-gray-100 !text-gray-900 px-4 py-1.5 text-[10px] hover:!bg-gray-200">Copy</button>
-            </div>
-            <div id="twitter-text" class="prose text-sm text-gray-800 leading-relaxed italic mono space-y-2"></div>
-        </div>
 
-        <div class="bg-white p-8 border-2 border-dark shadow-[4px_4px_0px_#1f2937]">
-            <div class="flex justify-between items-center mb-6 pb-2 border-b-2 border-gray-100">
-                <div class="flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 bg-indigo-400 border border-black rounded-full !important"></span>
-                    <span class="metric-label !text-[11px] text-indigo-700">LinkedIn Announcement</span>
+                <div id="promo-cards" class="hidden mt-10 grid grid-cols-1 md:grid-cols-2 gap-10 animate-fade-in">
+                    <div class="bg-white p-8 border-2 border-dark shadow-[4px_4px_0px_#1f2937]">
+                        <div class="flex justify-between items-center mb-6 pb-2 border-b-2 border-gray-100">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 bg-blue-400 border border-black rounded-full !important"></span>
+                                <span class="metric-label !text-[11px] text-blue-700">X Hook</span>
+                            </div>
+                            <button onclick="copySocial('twitter-text')" class="btn-primary !bg-gray-100 !text-gray-900 px-4 py-1.5 text-[10px] hover:!bg-gray-200">Copy</button>
+                        </div>
+                        <div id="twitter-text" class="prose text-sm text-gray-800 leading-relaxed italic mono space-y-2"></div>
+                    </div>
+
+                    <div class="bg-white p-8 border-2 border-dark shadow-[4px_4px_0px_#1f2937]">
+                        <div class="flex justify-between items-center mb-6 pb-2 border-b-2 border-gray-100">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 bg-indigo-400 border border-black rounded-full !important"></span>
+                                <span class="metric-label !text-[11px] text-indigo-700">LinkedIn Announcement</span>
+                            </div>
+                            <button onclick="copySocial('linkedin-text')" class="btn-primary !bg-gray-100 !text-gray-900 px-4 py-1.5 text-[10px] hover:!bg-gray-200">Copy</button>
+                        </div>
+                        <div id="linkedin-text" class="text-sm text-gray-800 leading-relaxed font-medium space-y-2"></div>
+                    </div>
                 </div>
-                <button onclick="copySocial('linkedin-text')" class="btn-primary !bg-gray-100 !text-gray-900 px-4 py-1.5 text-[10px] hover:!bg-gray-200">Copy</button>
             </div>
-            <div id="linkedin-text" class="text-sm text-gray-800 leading-relaxed font-medium space-y-2"></div>
         </div>
-    </div>
-</div>
 
         <div id="loadingState" class="hidden p-24 flex flex-col items-center justify-center min-h-[60vh]">
             <div class="agent-loader">
