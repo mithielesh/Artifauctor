@@ -1,46 +1,105 @@
-from fastapi import APIRouter, HTTPException
-from models.schemas import BlogRequest, BlogResponse, PublishRequest
+# backend/api/routes.py
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
+import logging
+import json
+
+# New Database & Auth Imports
+from database import get_db
+from models import schemas, db_models
+from auth_utils import get_current_user
+
+# Your existing services
 from services.serp_scraper import fetch_top_serp_results
-from services.agents import generate_seo_blog
+from services.agents import generate_seo_blog, generate_socials
 from services.validator import calculate_seo_metrics
 from services.publisher import publish_to_devto, publish_to_hashnode
-import logging
 
 router = APIRouter()
 
 # --- STAGE 1: THE AI PIPELINE ---
 
-@router.post("/generate", response_model=BlogResponse)
-async def generate_blog_endpoint(request: BlogRequest):
-    """
-    Executes the research, generation, and validation pipeline.
-    Returns the blog and SEO metrics to the frontend for editorial review.
-    """
-    logging.info(f"PIPELINE START: {request.keyword} | Domain: {request.domain}")
+@router.post("/generate", response_model=schemas.BlogResponse)
+async def generate_blog_endpoint(
+    request: schemas.BlogRequest,
+    db: Session = Depends(get_db),
+    current_user: db_models.User = Depends(get_current_user)
+):
+    logging.info(f"PIPELINE START: {request.keyword} | Domain: {request.domain} | User: {current_user.email}")
     
+    # 1. BYOK Check
+    if not current_user.gemini_key:
+        raise HTTPException(
+            status_code=400, 
+            detail="Gemini API Key missing. Please configure it in The Vault (Settings)."
+        )
+
     try:
-        # 1. THE EYES: Competitive SERP Research
+        # --- NEW: RAG-LITE INTERNAL LINKING LOOKUP ---
+        # Fetch up to 5 previously published articles to pass to the Writer Agent
+        previous_articles = db.query(db_models.ArticleHistory).filter(
+            db_models.ArticleHistory.user_id == current_user.id,
+            db_models.ArticleHistory.status == "Published"
+        ).order_by(db_models.ArticleHistory.id.desc()).limit(5).all()
+
+        links_for_ai = []
+        for art in previous_articles:
+            # Use whichever URL is available (Independent columns)
+            url = art.devto_url or art.hashnode_url
+            if url:
+                links_for_ai.append({"keyword": art.keyword, "url": url})
+        # CRITICAL: Log this so you can see it in your terminal
+        print(f"DEBUG: Found {len(links_for_ai)} links for AI context: {links_for_ai}")
+
+        # 2. THE EYES: Competitive SERP Research
         serp_data = fetch_top_serp_results(request.keyword, max_results=4)
         if not serp_data:
             raise HTTPException(status_code=500, detail="SERP Scraping Failed.")
             
-        # 2. THE BRAIN: Enterprise-Grade Generation (PAS Framework)
-        ai_result = generate_seo_blog(request.keyword, serp_data, request.domain)
+        # 3. THE BRAIN: Enhanced Generation (Now with Internal Links)
+        ai_result = generate_seo_blog(
+            keyword=request.keyword, 
+            serp_data=serp_data, 
+            domain=request.domain,
+            api_key=current_user.gemini_key,
+            brand_voice=current_user.brand_voice,
+            previous_links=links_for_ai # <-- Injected here
+        )
         if not ai_result:
             raise HTTPException(status_code=500, detail="AI Generation Failed.")
+
+        # --- NEW: AGENT 4 - SOCIAL MEDIA SPINOFFS ---
+        # Generate viral copy based on the fresh blog content
+        socials = generate_socials(ai_result["blog_content"], current_user.gemini_key)
             
-        # 3. THE JUDGE: Heuristic SEO & Naturalness Validation
+        # 4. THE JUDGE: SEO Metrics
         metrics = calculate_seo_metrics(request.keyword, ai_result["blog_content"], request.domain)
-        
         logging.info(f"PIPELINE COMPLETE: SEO Score {metrics['seo_score']}/100")
 
-        # 4. Return Data to UI for Editorial Approval
-        return BlogResponse(
+        # 5. THE VAULT: Save with Socials
+        new_article = db_models.ArticleHistory(
+            user_id=current_user.id,
+            keyword=request.keyword,
+            domain=request.domain,
+            content=ai_result["blog_content"],
+            seo_score=float(metrics["seo_score"]),
+            status="Draft",
+            twitter_thread=socials.get("twitter"), # <-- New Column
+            linkedin_post=socials.get("linkedin")   # <-- New Column
+        )
+        db.add(new_article)
+        db.commit()
+        db.refresh(new_article)
+
+        # 6. Return Data (Make sure your BlogResponse schema includes twitter/linkedin!)
+        return schemas.BlogResponse(
             keyword=request.keyword,
             domain=request.domain,
             outline=ai_result["outline"],
             blog_content=ai_result["blog_content"],
             seo_score=metrics["seo_score"],
+            twitter_thread=socials.get("twitter"), # Pass to UI
+            linkedin_post=socials.get("linkedin"), # Pass to UI
             keyword_density=metrics["keyword_density"],
             naturalness=metrics["naturalness"],
             snippet_readiness=metrics["snippet_readiness"],
@@ -55,19 +114,111 @@ async def generate_blog_endpoint(request: BlogRequest):
 # --- STAGE 2: THE PUBLISHING AGENTS (HITL) ---
 
 @router.post("/publish/devto")
-async def publish_devto_route(req: PublishRequest):
+async def publish_devto_route(
+    req: schemas.PublishRequest,
+    db: Session = Depends(get_db),
+    current_user: db_models.User = Depends(get_current_user)
+):
     """Triggered manually by the 'Approve' button for Dev.to"""
-    logging.info(f"Publishing Agent: Deploying to Dev.to...")
-    url = publish_to_devto(req.title, req.content)
+    logging.info(f"Publishing Agent: Deploying to Dev.to for {current_user.email}...")
+    
+    if not current_user.devto_key:
+        raise HTTPException(status_code=400, detail="Dev.to API Key missing in Settings.")
+
+    url = publish_to_devto(req.title, req.content, current_user.devto_key)
     if not url:
         raise HTTPException(status_code=500, detail="Dev.to deployment failed.")
+        
+    # Mark the latest draft as Published in the Vault
+    article = db.query(db_models.ArticleHistory).filter(
+            db_models.ArticleHistory.user_id == current_user.id
+        ).order_by(db_models.ArticleHistory.id.desc()).first()
+        
+    if article:
+        article.status = "Published"
+        article.devto_url = url # <-- Save specifically to Dev.to
+        db.commit()
+
     return {"url": url}
 
 @router.post("/publish/hashnode")
-async def publish_hashnode_route(req: PublishRequest):
+async def publish_hashnode_route(
+    req: schemas.PublishRequest,
+    db: Session = Depends(get_db),
+    current_user: db_models.User = Depends(get_current_user)
+):
     """Triggered manually by the 'Approve' button for Hashnode"""
-    logging.info(f"Publishing Agent: Deploying to Hashnode...")
-    url = publish_to_hashnode(req.title, req.content)
+    logging.info(f"Publishing Agent: Deploying to Hashnode for {current_user.email}...")
+    
+    if not current_user.hashnode_token or not current_user.hashnode_pub_id:
+        raise HTTPException(status_code=400, detail="Hashnode Token or Publication ID missing in Settings.")
+
+    url = publish_to_hashnode(req.title, req.content, current_user.hashnode_token, current_user.hashnode_pub_id)
     if not url:
         raise HTTPException(status_code=500, detail="Hashnode deployment failed.")
+        
+    # Mark the latest draft as Published in the Vault
+    article = db.query(db_models.ArticleHistory).filter(
+        db_models.ArticleHistory.user_id == current_user.id
+    ).order_by(db_models.ArticleHistory.id.desc()).first()
+        
+    if article:
+        article.status = "Published"
+        article.hashnode_url = url # <-- Save specifically to Hashnode
+        db.commit()
+
     return {"url": url}
+
+@router.post("/publish/vault/{article_id}/{platform}")
+async def publish_from_vault(
+    article_id: int,
+    platform: str,
+    db: Session = Depends(get_db),
+    current_user: db_models.User = Depends(get_current_user)
+):
+    """Deploys a saved draft directly from the Vault to the specified platform."""
+    
+    # 1. Securely fetch the specific article belonging to this user
+    article = db.query(db_models.ArticleHistory).filter(
+        db_models.ArticleHistory.id == article_id,
+        db_models.ArticleHistory.user_id == current_user.id
+    ).first()
+
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found in your Vault.")
+    
+    # Reconstruct the standard title format
+    title = f"The Future of {article.keyword}: A {article.domain} Deep-Dive"
+
+    try:
+        # 2. Route to the correct publisher based on the button clicked
+        if platform == "devto":
+            if not current_user.devto_key:
+                raise HTTPException(status_code=400, detail="Dev.to API Key missing in Settings.")
+            url = publish_to_devto(title, article.content, current_user.devto_key)
+
+        elif platform == "hashnode":
+            if not current_user.hashnode_token or not current_user.hashnode_pub_id:
+                raise HTTPException(status_code=400, detail="Hashnode Token or Pub ID missing in Settings.")
+            url = publish_to_hashnode(title, article.content, current_user.hashnode_token, current_user.hashnode_pub_id)
+            
+        else:
+            raise HTTPException(status_code=400, detail="Unknown platform selected.")
+
+        if not url:
+            raise HTTPException(status_code=500, detail=f"{platform.capitalize()} deployment failed.")
+
+        # 3. Update the specific Vault URL and Status!
+        article.status = "Published"
+        
+        if platform == "devto":
+            article.devto_url = url
+        elif platform == "hashnode":
+            article.hashnode_url = url
+            
+        db.commit()
+
+        return {"url": url}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

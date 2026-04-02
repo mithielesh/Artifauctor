@@ -30,3 +30,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Database files
+backend/*.db
+backend/*.db.sqlite3

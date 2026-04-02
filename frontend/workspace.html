@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Artifauctor | Autonomous Content Pipeline</title>
+    <title>Workspace | Artifauctor Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -11,16 +11,16 @@
     <style>
         /* RELAXED NEO-BRUTALIST THEME */
         :root { 
-            --bg-main: #fcfbf9;      /* Warm, relaxing off-white/cream */
-            --bg-sidebar: #f3f0ff;   /* Soft, pale lavender */
+            --bg-main: #fcfbf9;      
+            --bg-sidebar: #f3f0ff;   
             --bg-card: #ffffff;
             --text-dark: #111827;
             --border-dark: #1f2937;
-            --accent-btn: #818cf8;   /* Soft indigo */
+            --accent-btn: #818cf8;   
             --accent-hover: #6366f1;
             --shadow-sm: 3px 3px 0px var(--border-dark);
             --shadow-md: 5px 5px 0px var(--border-dark);
-            --radius: 8px;           /* Softened corners for a relaxed feel */
+            --radius: 8px;           
         }
         
         * { border-radius: var(--radius) !important; cursor: crosshair; } 
@@ -93,7 +93,7 @@
         .metric-label { font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #555; letter-spacing: 0.05em; }
         .metric-value { font-family: 'JetBrains Mono'; font-size: 1.5rem; font-weight: 700; color: var(--text-dark); margin-top: 0.25rem; }
 
-        /* UNIQUE LOADING ANIMATION (The "Working Agents") */
+        /* UNIQUE LOADING ANIMATION */
         .agent-loader { display: flex; gap: 12px; margin-bottom: 24px; }
         .agent-block {
             width: 32px; height: 32px;
@@ -102,10 +102,9 @@
             box-shadow: 2px 2px 0px var(--border-dark);
             animation: buildBounce 1.2s infinite ease-in-out alternate;
         }
-        /* Pastel colors for the 3 agents */
-        .agent-block:nth-child(1) { background-color: #fca5a5; } /* Red: Strategist */
-        .agent-block:nth-child(2) { background-color: #fde047; animation-delay: 0.2s; } /* Yellow: Writer */
-        .agent-block:nth-child(3) { background-color: #86efac; animation-delay: 0.4s; } /* Green: Validator */
+        .agent-block:nth-child(1) { background-color: #fca5a5; } 
+        .agent-block:nth-child(2) { background-color: #fde047; animation-delay: 0.2s; } 
+        .agent-block:nth-child(3) { background-color: #86efac; animation-delay: 0.4s; } 
 
         @keyframes buildBounce {
             0% { transform: translateY(0) rotate(0deg); }
@@ -142,6 +141,19 @@
 
     <main class="main-content">
         <div class="sticky top-0 bg-white border-b-2 border-dark z-10 px-10 py-6">
+            
+            <div class="flex justify-between items-center mb-6 pb-4 border-b-2 border-dashed border-gray-300">
+                <h2 class="text-xl font-black uppercase tracking-widest text-gray-800">Workspace Engine</h2>
+                <div class="flex gap-4">
+                    <button id="nav-vault" class="btn-primary !bg-gray-100 !text-gray-900 px-4 py-2 rounded text-sm hover:!bg-gray-200">
+                        ← The Vault
+                    </button>
+                    <button id="nav-logout" class="btn-primary !bg-red-200 !text-gray-900 px-4 py-2 rounded text-sm hover:!bg-red-300">
+                        Terminate Session
+                    </button>
+                </div>
+            </div>
+
             <div class="flex flex-col lg:flex-row gap-5 items-end">
                 <div class="flex-1 w-full">
                     <label class="metric-label mb-2 block">Target Keyword</label>
@@ -166,7 +178,7 @@
                     <label for="autoPublish" class="metric-label whitespace-nowrap cursor-pointer">Auto-Deploy</label>
                 </div>
 
-                <button id="generateBtn" class="btn-primary px-10 py-4 text-sm">
+                <button id="generateBtn" onclick="runPipeline()" class="btn-primary px-10 py-4 text-sm">
                     Run Pipeline
                 </button>
             </div>
@@ -229,6 +241,43 @@
                 <div id="blogOutput" class="prose bg-white p-10 border-2 border-dark shadow-[4px_4px_0px_#1f2937]"></div>
             </div>
         </div>
+        <div id="social-container" class="hidden mt-12 mb-16 p-10 bg-gray-50 border-t-2 border-dashed border-gray-300">
+    
+            <div id="promo-trigger" class="input-box p-6 grid grid-cols-1 lg:grid-cols-[1fr,auto] items-center gap-6 bg-white transition-all">
+                <div>
+            <h3 class="text-2xl font-bold tracking-tight text-gray-900">Do you want to let your followers know you've posted a blog?</h3>
+            <p class="text-xs text-gray-500 mono uppercase tracking-widest mt-1">Select platforms to generate announcement hooks</p>
+        </div>
+        <button onclick="revealSocialCards()" class="btn-primary !py-4 px-10 text-xs">
+            Generate Promo Posts
+        </button>
+    </div>
+
+    <div id="promo-cards" class="hidden mt-10 grid grid-cols-1 md:grid-cols-2 gap-10 animate-fade-in">
+        
+        <div class="bg-white p-8 border-2 border-dark shadow-[4px_4px_0px_#1f2937]">
+            <div class="flex justify-between items-center mb-6 pb-2 border-b-2 border-gray-100">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 bg-blue-400 border border-black rounded-full !important"></span>
+                    <span class="metric-label !text-[11px] text-blue-700">X Hook</span>
+                </div>
+                <button onclick="copySocial('twitter-text')" class="btn-primary !bg-gray-100 !text-gray-900 px-4 py-1.5 text-[10px] hover:!bg-gray-200">Copy</button>
+            </div>
+            <div id="twitter-text" class="prose text-sm text-gray-800 leading-relaxed italic mono space-y-2"></div>
+        </div>
+
+        <div class="bg-white p-8 border-2 border-dark shadow-[4px_4px_0px_#1f2937]">
+            <div class="flex justify-between items-center mb-6 pb-2 border-b-2 border-gray-100">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 bg-indigo-400 border border-black rounded-full !important"></span>
+                    <span class="metric-label !text-[11px] text-indigo-700">LinkedIn Announcement</span>
+                </div>
+                <button onclick="copySocial('linkedin-text')" class="btn-primary !bg-gray-100 !text-gray-900 px-4 py-1.5 text-[10px] hover:!bg-gray-200">Copy</button>
+            </div>
+            <div id="linkedin-text" class="text-sm text-gray-800 leading-relaxed font-medium space-y-2"></div>
+        </div>
+    </div>
+</div>
 
         <div id="loadingState" class="hidden p-24 flex flex-col items-center justify-center min-h-[60vh]">
             <div class="agent-loader">
@@ -241,6 +290,6 @@
         </div>
     </main>
 
-    <script src="app.js"></script>
+    <script src="workspace.js"></script>
 </body>
 </html>

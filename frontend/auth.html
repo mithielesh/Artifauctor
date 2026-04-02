@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication - Artifauctor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #f3f0ff; font-family: 'Space Grotesk', sans-serif; overflow-x: hidden; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        .brutalist-card { border: 3px solid #111827; box-shadow: 8px 8px 0px #111827; background: #ffffff; transition: all 0.3s ease; }
+        .brutalist-input { border: 2px solid #111827; box-shadow: 4px 4px 0px #111827; transition: all 0.2s; }
+        .brutalist-input:focus { outline: none; transform: translate(2px, 2px); box-shadow: 2px 2px 0px #111827; }
+        .brutalist-btn { border: 2px solid #111827; box-shadow: 4px 4px 0px #111827; transition: all 0.2s; font-weight: bold; cursor: pointer; }
+        .brutalist-btn:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0px #111827; }
+        
+        /* Custom Toggle Switch Styles */
+        .toggle-wrapper { border: 3px solid #111827; box-shadow: 4px 4px 0px #111827; border-radius: 8px; overflow: hidden; display: flex; }
+        .toggle-btn { flex: 1; padding: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; transition: background-color 0.2s; cursor: pointer; }
+        .toggle-btn:first-child { border-right: 3px solid #111827; }
+        
+        /* State Colors */
+        .bg-login-active { background-color: #c4b5fd; color: #111827; }
+        .bg-register-active { background-color: #86efac; color: #111827; }
+        .bg-inactive { background-color: #f9fafb; color: #9ca3af; }
+        .bg-inactive:hover { background-color: #f3f4f6; color: #111827; }
+
+        /* Brutalist Toast Notifications */
+        .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 50; display: flex; flex-direction: column; gap: 10px; }
+        .brutalist-toast { 
+            border: 3px solid #111827; box-shadow: 4px 4px 0px #111827; border-radius: 8px; 
+            padding: 16px 20px; font-weight: bold; display: flex; align-items: center; justify-content: space-between;
+            min-width: 300px; transform: translateX(120%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .toast-success { background-color: #86efac; color: #111827; }
+        .toast-error { background-color: #fca5a5; color: #111827; }
+        .toast-show { transform: translateX(0); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <main class="flex-grow flex items-center justify-center p-6">
+        <div class="brutalist-card max-w-md w-full p-8 space-y-8 rounded-xl" id="auth-card">
+            
+            <div class="toggle-wrapper">
+                <button type="button" id="toggle-login" class="toggle-btn bg-login-active">Login</button>
+                <button type="button" id="toggle-register" class="toggle-btn bg-inactive">Register</button>
+            </div>
+
+            <div class="text-center h-20 flex flex-col justify-center">
+                <h1 id="auth-title" class="text-4xl font-black text-gray-900 tracking-tight transition-all">Session Init</h1>
+                <p id="auth-subtitle" class="mt-2 text-gray-600 font-medium transition-all">Access your enterprise pipeline.</p>
+            </div>
+
+            <div class="relative">
+                <form id="login-form" class="space-y-6 block">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-900 uppercase">Email Address</label>
+                        <input id="login-email" type="email" required class="brutalist-input w-full mt-1 p-3 rounded-lg mono" placeholder="hacker@artifauctor.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-900 uppercase">Password</label>
+                        <input id="login-password" type="password" required class="brutalist-input w-full mt-1 p-3 rounded-lg mono" placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="brutalist-btn w-full py-3 px-4 rounded-lg text-gray-900 uppercase tracking-widest text-lg" style="background-color: #c4b5fd;">
+                        Authenticate
+                    </button>
+                </form>
+
+                <form id="register-form" class="space-y-6 hidden">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-900 uppercase">Email Address</label>
+                        <input id="reg-email" type="email" required class="brutalist-input w-full mt-1 p-3 rounded-lg mono" placeholder="new@artifauctor.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-900 uppercase">Secure Password</label>
+                        <input id="reg-password" type="password" required class="brutalist-input w-full mt-1 p-3 rounded-lg mono" placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="brutalist-btn w-full py-3 px-4 rounded-lg text-gray-900 uppercase tracking-widest text-lg" style="background-color: #86efac;">
+                        Create Workspace
+                    </button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <footer class="border-t-4 border-gray-900 bg-white p-6 mt-auto">
+        <div class="max-w-7xl mx-auto flex justify-between items-center w-full">
+            <div class="font-black text-xl tracking-tighter text-gray-900">ARTIFAUCTOR</div>
+            <div class="mono text-xs font-bold text-gray-500 uppercase tracking-widest text-right">Enterprise Content Pipeline v2.0</div>
+        </div>
+    </footer>
+
+    <script>
+        const API_BASE_URL = 'http://127.0.0.1:8000/api/v1/users';
+
+        // --- Custom Toast Logic ---
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `brutalist-toast toast-${type}`;
+            
+            toast.innerHTML = `
+                <span>${message}</span>
+                <button type="button" onclick="this.parentElement.style.transform='translateX(120%)'; setTimeout(()=>this.parentElement.remove(), 300)" class="ml-4 font-black text-xl leading-none">&times;</button>
+            `;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => toast.classList.add('toast-show'), 10);
+            
+            setTimeout(() => {
+                toast.classList.remove('toast-show');
+                setTimeout(() => toast.remove(), 300); 
+            }, 4000);
+        }
+
+        // --- UI Toggle Logic ---
+        function switchMode(mode) {
+            const loginForm = document.getElementById('login-form');
+            const registerForm = document.getElementById('register-form');
+            const btnLogin = document.getElementById('toggle-login');
+            const btnRegister = document.getElementById('toggle-register');
+            const title = document.getElementById('auth-title');
+            const subtitle = document.getElementById('auth-subtitle');
+
+            loginForm.reset();
+            registerForm.reset();
+
+            if (mode === 'login') {
+                loginForm.classList.remove('hidden');
+                registerForm.classList.add('hidden');
+                
+                btnLogin.className = 'toggle-btn bg-login-active';
+                btnRegister.className = 'toggle-btn bg-inactive';
+                
+                title.innerText = 'Session Init';
+                subtitle.innerText = 'Access your enterprise pipeline.';
+            } else {
+                registerForm.classList.remove('hidden');
+                loginForm.classList.add('hidden');
+                
+                btnRegister.className = 'toggle-btn bg-register-active';
+                btnLogin.className = 'toggle-btn bg-inactive';
+                
+                title.innerText = 'New Clearance';
+                subtitle.innerText = 'Create your BYOK workspace.';
+            }
+        }
+
+        // --- API Logic ---
+        async function registerUser(event) {
+            event.preventDefault();
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                if (response.ok) {
+                    showToast('Workspace Created! Switching to Login...', 'success');
+                    document.getElementById('register-form').reset();
+                    setTimeout(() => switchMode('login'), 1500); 
+                } else {
+                    const error = await response.json();
+                    showToast(`Error: ${error.detail}`, 'error');
+                }
+            } catch (err) {
+                console.error('Registration failed:', err);
+                showToast('Server connection failed.', 'error');
+            }
+        }
+
+        async function loginUser(event) {
+            event.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            const formData = new URLSearchParams();
+            formData.append('username', email); 
+            formData.append('password', password);
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('artifauctor_token', data.access_token);
+                    showToast('Authentication accepted. Redirecting...', 'success');
+                    
+                    setTimeout(() => {
+                        window.location.href = 'dashboard.html';
+                    }, 1000);
+                } else {
+                    showToast('Invalid credentials. Access denied.', 'error');
+                }
+            } catch (err) {
+                console.error('Login failed:', err);
+                showToast('Server connection failed.', 'error');
+            }
+        }
+
+        // --- Safely Attach Event Listeners ---
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('login-form').addEventListener('submit', loginUser);
+            document.getElementById('register-form').addEventListener('submit', registerUser);
+
+            document.getElementById('toggle-login').addEventListener('click', () => switchMode('login'));
+            document.getElementById('toggle-register').addEventListener('click', () => switchMode('register'));
+        });
+    </script>
+</body>
+</html>

@@ -1,24 +1,23 @@
-import os
+# backend/services/publisher.py
 import requests
 import logging
-from dotenv import load_dotenv
-
-load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
-DEVTO_API_KEY = os.getenv("DEVTO_API_KEY")
-HASHNODE_TOKEN = os.getenv("HASHNODE_TOKEN")
-HASHNODE_PUBLICATION_ID = os.getenv("HASHNODE_PUBLICATION_ID")
-
-def publish_to_devto(title: str, markdown_content: str, tags: list = ["ai", "automation"]) -> str:
-    """Publishes to Dev.to via REST API."""
-    if not DEVTO_API_KEY:
+def publish_to_devto(title: str, markdown_content: str, api_key: str, tags: list = None) -> str:
+    """Publishes to Dev.to via REST API using the user's secure DB key."""
+    if tags is None:
+        tags = ["ai", "automation"]
+        
+    if not api_key:
+        logging.error("Agent: Dev.to API key missing.")
         return None
         
     logging.info("Agent: Deploying to Dev.to...")
     url = "https://dev.to/api/articles"
-    headers = {"api-key": DEVTO_API_KEY, "Content-Type": "application/json"}
+    
+    # We now inject the user's specific key directly into the headers
+    headers = {"api-key": api_key, "Content-Type": "application/json"}
     payload = {
         "article": {
             "title": title,
@@ -30,21 +29,28 @@ def publish_to_devto(title: str, markdown_content: str, tags: list = ["ai", "aut
     
     try:
         response = requests.post(url, json=payload, headers=headers)
-        return response.json().get("url") if response.status_code == 201 else None
+        if response.status_code == 201:
+            return response.json().get("url")
+        else:
+            logging.error(f"Dev.to API explicitly rejected the post. Status: {response.status_code}, Response: {response.text}")
+            return None
     except Exception as e:
         logging.error(f"Dev.to Error: {e}")
         return None
 
-def publish_to_hashnode(title: str, markdown_content: str) -> str:
-    """Uses Hashnode GQL 2.0 - LOUD DEBUG EDITION"""
-    if not HASHNODE_TOKEN or not HASHNODE_PUBLICATION_ID:
-        logging.error("Missing HASHNODE_TOKEN or PUBLICATION_ID in .env")
+def publish_to_hashnode(title: str, markdown_content: str, token: str, pub_id: str) -> str:
+    """Uses Hashnode GQL 2.0 with the user's personal Token and Publication ID"""
+    
+    if not token or not pub_id:
+        logging.error("Agent: Missing Hashnode Token or Publication ID")
         return None
 
-    logging.info(f"Agent: Deploying to Hashnode via GraphQL (Pub ID: {HASHNODE_PUBLICATION_ID})...")
+    logging.info(f"Agent: Deploying to Hashnode via GraphQL (Pub ID: {pub_id})...")
     url = "https://gql.hashnode.com"
+    
+    # We now inject the user's specific token directly into the headers
     headers = {
-        "Authorization": HASHNODE_TOKEN,
+        "Authorization": token,
         "Content-Type": "application/json"
     }
     
@@ -59,7 +65,7 @@ def publish_to_hashnode(title: str, markdown_content: str) -> str:
     """
     variables = {
         "input": {
-            "publicationId": HASHNODE_PUBLICATION_ID,
+            "publicationId": pub_id,
             "title": title,
             "contentMarkdown": markdown_content
         }
@@ -84,16 +90,3 @@ def publish_to_hashnode(title: str, markdown_content: str) -> str:
     except Exception as e:
         logging.error(f"Hashnode Request Failed (Python Crash): {e}")
         return None
-
-def deploy_to_all_platforms(keyword: str, markdown_content: str):
-    """Orchestrates simultaneous deployment to free, developer-friendly APIs."""
-    title = f"Deep Dive: {keyword.title()} - Trends & Automation"
-    urls = {}
-    
-    dev_url = publish_to_devto(title, markdown_content)
-    if dev_url: urls["Dev.to"] = dev_url
-        
-    hash_url = publish_to_hashnode(title, markdown_content)
-    if hash_url: urls["Hashnode"] = hash_url
-        
-    return urls
