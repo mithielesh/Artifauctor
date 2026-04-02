@@ -1,15 +1,17 @@
-# Artifauctor - Autonomous Content Pipeline
+# Artifauctor - Autonomous Content Pipeline v2.0
 
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Gemini](https://img.shields.io/badge/Gemini_2.5_Flash-8E75B2?style=flat-square&logo=googlebard&logoColor=white)](https://aistudio.google.com/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org/)
 [![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?style=flat-square&logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.0-38B2AC?style=flat-square&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![GraphQL](https://img.shields.io/badge/GraphQL-E10098?style=flat-square&logo=graphql&logoColor=white)](https://graphql.org/)
+[![SQLite](https://img.shields.io/badge/SQLite-07405E?style=flat-square&logo=sqlite&logoColor=white)](https://sqlite.org/)
 
-An enterprise-grade, multi-agent AI SEO engine that researches, drafts, validates, and autonomously deploys high-ranking content using a Human-in-the-Loop (HITL) architecture.
+An enterprise-grade, multi-agent AI SEO engine that researches, drafts, validates, and autonomously deploys high-ranking content. **Version 2.0** introduces Hybrid ML Semantic Validation, Asynchronous Auto-Deployment, and a multi-tenant User Vault.
 
-## System Architecture
+## System Architecture (v2.0)
 
 ```mermaid
 flowchart LR
@@ -18,33 +20,39 @@ flowchart LR
     classDef agent fill:#818cf8,stroke:#1f2937,stroke-width:2px,color:#fff
     classDef external fill:#1f2937,stroke:#fff,stroke-width:2px,color:#fff
     classDef deploy fill:#10b981,stroke:#1f2937,stroke-width:2px,color:#fff
+    classDef db fill:#f59e0b,stroke:#1f2937,stroke-width:2px,color:#fff
 
     %% Flow
-    User([User Input]) --> API{FastAPI Engine}
+    User([User Input / Auth]) --> API{FastAPI Engine}
     
-    %% Research Phase
+    %% DB & Research Phase
+    API <-->|RAG-Lite Links| Vault[(SQLite DB)]
     API -->|1. Keyword| Scraper[Tavily Scraper]
     Scraper -.->|Live SERP Data| API
     
     %% Multi-Agent Pipeline
     API -->|2. Context| Strat[Agent 1: Strategist]
     Strat -->|Outline| Writer[Agent 2: Writer]
-    Writer -->|Draft| Val[Agent 3: Validator]
+    Writer -->|Draft| Social[Agent 3: Social Architect]
+    Social -->|Post & Thread| Val[Agent 4: ML Validator]
     
-    %% HITL Deployment
-    Val --> UI[Neo-Brutalist UI & Metrics]
-    UI --> App{HITL Approval}
+    %% HITL & Background Tasks
+    Val -->|Draft Saved| UI[Neo-Brutalist UI]
+    UI --> App{Action}
+    App -->|Approve Now| Publish
+    App -->|Schedule| Worker((APScheduler))
+    Worker -.->|CRON Trigger| Publish
     
     %% Publishing
-    App -->|Approve| DevTo[Dev.to REST API]
-    App -->|Approve| Hash[Hashnode GQL API]
-    App -->|Reject| Drop((Discard))
+    Publish --> DevTo[Dev.to API]
+    Publish --> Hash[Hashnode API]
 
     %% Apply Classes
-    class User,UI,Drop input;
-    class Strat,Writer,Val agent;
+    class User,UI input;
+    class Strat,Writer,Social,Val agent;
     class Scraper external;
     class DevTo,Hash deploy;
+    class Vault,Worker db;
 ```
 
 ## Core Features
@@ -54,18 +62,26 @@ flowchart LR
 - **Master Writer Agent:** Drafts 1,000+ word deep-dives using the PAS framework (Problem-Agitate-Solution) with code snippets and Markdown tables.
 - **Validator Agent:** Runs local heuristic scoring for SEO performance, naturalness, keyword density, and snippet readiness.
 
-### Real-Time Intelligence & Reliability
-- **Zero-Hallucination Grounding:** Uses Tavily to inject live Google Search data directly into the LLM context window.
-- **Enterprise Retry Logic:** Built-in exponential backoff to seamlessly handle API rate limits (HTTP 429) without crashing.
+### Asynchronous Publishing Engine
+- **Auto-Deploy Scheduler:** Built with apscheduler. Users can draft content and set future deployment timestamps. A background worker silently monitors the queue and auto-publishes to external platforms exactly on time.
+- **RAG-Lite Internal Linking:** The engine autonomously pulls a user's previously published URLs from the database and injects them into the Writer Agent's context window for dynamic SEO backlinking.
+
+### The Vault (Multi-Tenant Auth)
+- **Stateless JWT Security:** Full user authentication allowing multiple users to operate their own pipelines.
+- **Bring Your Own Key (BYOK):** Users store their own Gemini API keys securely in the DB, ensuring zero liability for public hosting.
+
+### Social Architect (Agent 3)
+- **Content Syndication:** Automatically spins off the 1,000+ word blog draft into a highly-engaging LinkedIn post and a viral Twitter/X Thread, ready for 1-click clipboard copying.
+
+### Hybrid ML Validator (Agent 4)
+- **Upgraded Heuristics:** Transitions from basic heuristics to a local Machine Learning pipeline.
+- **Semantic Cosine Similarity:** Uses Hugging Face's all-MiniLM-L6-v2 via sentence-transformers to guarantee the generated content semantically matches the target keyword.
+- **Human-Proxy Scoring:** Calculates Flesch Reading Ease and sentence-length variance (burstiness) to ensure high "Naturalness" and avoid AI-content detectors.
 
 ### Human-in-the-Loop (HITL) Deployment
 - **Staging Dashboard:** Holds generated content in a pending state for editorial review.
 - **One-Click Publishing:** Transforms approved drafts into live articles on Dev.to and Hashnode instantly.
 - **BYOK Architecture:** Designed to support "Bring Your Own Key" for stateless, zero-liability public hosting.
-
-### Neo-Brutalist UX
-- **Custom CSS Engine:** Pastel Space Grotesk aesthetics with sharp borders, heavy shadows, and interactive input pills.
-- **Agent Visualizer:** Custom CSS keyframe animations representing the 3 backend agents working in tandem.
 
 ## Technology Stack
 
@@ -74,7 +90,7 @@ flowchart LR
 - Uvicorn (ASGI Server)
 
 **AI & External APIs**
-- Google Gemini API (gemini-2.5-flash-lite)
+- Google Gemini API (gemini-2.5-flash/flash-lite)
 - Tavily Search API
 - Hashnode GraphQL 2.0 API
 - Dev.to REST API
@@ -84,7 +100,7 @@ flowchart LR
 - Tailwind CSS (Utility styling)
 - Marked.js (Markdown to HTML parsing)
 
-## API Overview
+## Major API Overview
 
 ### AI Generation (/api/v1)
 | Endpoint | Method | Description |
