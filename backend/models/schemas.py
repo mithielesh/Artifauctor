@@ -79,3 +79,11 @@ class NoteRequest(BaseModel):
     title: str
     content: str
     is_bulleted: bool
+
+# --- THE MUSE SCHEMAS ---
+
+class MuseRequest(BaseModel):
+    message: str
+
+class MuseResponse(BaseModel):
+    reply: str

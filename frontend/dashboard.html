@@ -37,6 +37,48 @@
         .toast-success { background-color: #86efac; color: #111827; }
         .toast-error { background-color: #fca5a5; color: #111827; }
         .toast-show { transform: translateX(0); }
+
+        /* The Muse: High-Voltage Neo-Brutalism */
+        #muse-trigger {
+            background: #A855F7; /* Electric Purple */
+            border: 5px solid #000;
+            box-shadow: 6px 6px 0px #000;
+            transition: all 0.1s font-weight;
+        }
+
+        #muse-trigger:hover {
+            transform: translate(-2px, -2px);
+            box-shadow: 8px 8px 0px #000;
+            background: #BCFB2D; /* Hits a lime green on hover for that 'clash' aesthetic */
+        }
+
+        #muse-trigger:active {
+            transform: translate(4px, 4px);
+            box-shadow: 0px 0px 0px #000;
+        }
+
+        #muse-chat {
+            border: 6px solid #000;
+            box-shadow: 15px 15px 0px #000;
+            background: #fff;
+        }
+
+        /* Hard-edged header */
+        .muse-header {
+            background: #000;
+            color: #fff;
+            padding: 10px;
+            font-family: 'Black Ops One', system-ui; /* Or your chosen heavy font */
+            letter-spacing: -1px;
+        }
+
+        /* The Input Field - No rounded corners allowed here */
+        #muse-input {
+            border: 4px solid #000;
+            background: #fff;
+            padding: 10px;
+            font-weight: 900;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -126,6 +168,34 @@
                     Save Configuration
                 </button>
             </form>
+        </div>
+    </div>
+    <div id="muse-container" class="fixed bottom-8 left-8 z-50">
+        <button id="muse-trigger" class="w-16 h-16 rounded-full flex items-center justify-center text-3xl hover:scale-110 active:translate-y-1 active:shadow-none transition-all animate-bounce">
+            ✨
+        </button>
+
+        <div id="muse-chat" class="hidden absolute bottom-24 left-0 w-80 rounded-xl flex flex-col overflow-hidden">
+            <div class="muse-header flex justify-between items-center">
+                <span class="text-xs font-black uppercase">MUSE THE IDEA BOT</span>
+                <button id="close-muse" class="brutalist-btn bg-red-400 text-black px-2 py-1 text-[10px] font-black uppercase tracking-tighter">
+                    Close
+                </button>
+            </div>
+            
+            <div id="muse-messages" class="h-64 overflow-y-auto p-4 space-y-4 bg-purple-50 font-bold text-sm note-scroll">
+                <div class="bg-white border-4 border-black p-2 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+                    <span class="block text-[10px] uppercase opacity-50 mb-1">RESPONSE</span>
+                    The Vault is full of echoes. Need a new sound? Ask me for an idea.
+                </div>
+            </div>
+
+            <div class="p-3 border-t-4 border-black bg-white">
+                <textarea id="muse-input" rows="2" class="w-full text-sm font-bold focus:outline-none resize-none placeholder-gray-400" placeholder="Ask for a headline..."></textarea>
+                <button id="send-muse" class="brutalist-btn w-full mt-2 bg-purple-300 py-2 uppercase text-xs font-black tracking-widest">
+                    Ignite Spark
+                </button>
+            </div>
         </div>
     </div>
 

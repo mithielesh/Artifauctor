@@ -14,7 +14,7 @@ from auth_utils import get_current_user
 
 # Your existing services
 from services.serp_scraper import fetch_top_serp_results
-from services.agents import generate_seo_blog, generate_socials
+from services.agents import generate_seo_blog, generate_socials, call_the_muse
 from services.validator import calculate_seo_score, calculate_humanness_score
 from services.publisher import publish_to_devto, publish_to_hashnode
 
@@ -336,7 +336,21 @@ async def update_note(note_id: int, request: schemas.NoteRequest, db: Session = 
 @router.delete("/notes/{note_id}", tags=["Notebook"])
 async def delete_note(note_id: int, db: Session = Depends(get_db), current_user: db_models.User = Depends(get_current_user)):
     note = db.query(db_models.IdeaNote).filter(db_models.IdeaNote.id == note_id, db_models.IdeaNote.user_id == current_user.id).first()
-    if note:
-        db.delete(note)
-        db.commit()
+    if not note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    db.delete(note)
+    db.commit()
     return {"status": "deleted"}
+
+@router.post("/muse", response_model=schemas.MuseResponse, tags=["Agentic AI"])
+async def handle_muse_query(
+    request: schemas.MuseRequest, 
+    current_user: db_models.User = Depends(get_current_user)
+):
+    try:
+        # Pass the current_user's gemini_key here!
+        reply = call_the_muse(request.message, current_user.gemini_key)
+        return {"reply": reply}
+    except Exception as e:
+        logging.error(f"Muse Route Error: {e}")
+        return {"reply": "THE SPARK HAS FLICKERED. TRY AGAIN."}

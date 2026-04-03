@@ -168,3 +168,37 @@ def generate_socials(article_content: str, api_key: str) -> dict:
     except Exception as e:
         logging.error(f"Social Generation failed: {e}")
         return {"twitter": "Failed to generate.", "linkedin": "Failed to generate."}
+    
+def call_the_muse(user_input: str, api_key: str) -> str: # 1. Pass the api_key as an argument
+    """The Muse: Neo-Brutalist Idea Bot using Gemini SDK"""
+    if not api_key:
+        return "NO KEY, NO SPARK. CHECK YOUR VAULT."
+        
+    try:
+        # 2. Use the same GenAI client pattern as your other functions
+        client = genai.Client(api_key=api_key)
+        model_id = 'gemini-2.5-flash-lite'
+        
+        system_prompt = (
+            "You are 'The Muse', a Neo-Brutalist creative strategist. "
+            "Your ONLY mission is to spark content ideas, headlines, and outlines. "
+            "If the user asks for code, math, or general facts, reply: 'MY SPARK IS FOR STORIES ONLY. ASK FOR AN IDEA.' "
+            "Keep responses under 60 words. Use punchy, loud, and authoritative language. "
+            "Do not use markdown headers, just raw, powerful text."
+        )
+        
+        # 3. Use the correct .models.generate_content syntax for the Google SDK
+        response = client.models.generate_content(
+            model=model_id,
+            contents=f"{system_prompt}\n\nUSER SIGNAL: {user_input}",
+            config=types.GenerateContentConfig(
+                temperature=0.8,
+                max_output_tokens=150
+            )
+        )
+        
+        return response.text
+        
+    except Exception as e:
+        logging.error(f"Idea Generation failed: {e}")
+        return "THE SPARK HAS FLICKERED. TRY AGAIN."

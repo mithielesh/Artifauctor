@@ -238,3 +238,120 @@ document.addEventListener('DOMContentLoaded', () => {
 
     loadProfile();
 });
+
+// --- THE MUSE: IDEA BOT LOGIC ---
+
+document.addEventListener('DOMContentLoaded', () => {
+    const museTrigger = document.getElementById('muse-trigger');
+    const museChat = document.getElementById('muse-chat');
+    const closeMuse = document.getElementById('close-muse');
+    const sendMuse = document.getElementById('send-muse');
+    const museInput = document.getElementById('muse-input');
+    const museMessages = document.getElementById('muse-messages');
+
+    // 1. Toggle the Chat Window
+    museTrigger.addEventListener('click', () => {
+        museChat.classList.toggle('hidden');
+        if (!museChat.classList.contains('hidden')) {
+            museInput.focus();
+        }
+    });
+
+    closeMuse.addEventListener('click', () => {
+        museChat.classList.add('hidden');
+    });
+
+    // 2. The Interaction Logic
+    async function igniteSpark() {
+        const text = museInput.value.trim();
+        if (!text) return;
+
+        // Display the User Request
+        appendMuseMessage('REQUEST', text);
+        museInput.value = '';
+
+        // Show a "Thinking" state
+        const loadingId = 'muse-loading-' + Date.now();
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = loadingId;
+        loadingDiv.className = "bg-gray-100 border-4 border-black p-2 shadow-[4px_4px_0px_rgba(0,0,0,1)] mr-8 animate-pulse text-xs font-black uppercase";
+        loadingDiv.innerText = "Processing Request...";
+        museMessages.appendChild(loadingDiv);
+        museMessages.scrollTop = museMessages.scrollHeight;
+
+        try {
+            const response = await fetch('http://127.0.0.1:8000/api/v1/muse', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}` // Uses your existing bouncer token
+                },
+                body: JSON.stringify({ message: text })
+            });
+
+            const data = await response.json();
+            
+            // Remove loading state
+            document.getElementById(loadingId).remove();
+
+            if (data.reply) {
+                appendMuseMessage('RESPONSE', data.reply);
+            } else {
+                appendMuseMessage('ERROR', 'THE SPARK FLICKERED OUT.');
+            }
+        } catch (err) {
+            if (document.getElementById(loadingId)) document.getElementById(loadingId).remove();
+            appendMuseMessage('ERROR', 'VOID DETECTED. CHECK CONNECTION.');
+        }
+    }
+
+    // Event Listeners for sending
+    sendMuse.addEventListener('click', igniteSpark);
+    
+    museInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            igniteSpark();
+        }
+    });
+
+    // 3. Helper to build Brutalist Message Blocks (With Bullet Support)
+    function appendMuseMessage(type, msg) {
+        const msgDiv = document.createElement('div');
+        
+        // Request (User) vs Response (AI) styling
+        if (type === 'REQUEST') {
+            msgDiv.className = "bg-indigo-200 border-4 border-black p-2 shadow-[4px_4px_0px_rgba(0,0,0,1)] ml-8 text-sm font-bold";
+        } else if (type === 'RESPONSE') {
+            msgDiv.className = "bg-white border-4 border-black p-2 shadow-[4px_4px_0px_rgba(0,0,0,1)] mr-8 text-sm font-bold";
+        } else {
+            msgDiv.className = "bg-red-400 border-4 border-black p-2 shadow-[4px_4px_0px_rgba(0,0,0,1)] mr-8 text-sm font-black uppercase";
+        }
+
+        // --- THE FORMATTING LOGIC ---
+        let finalContent = msg;
+        
+        // If the message contains '*' or multiple lines, turn it into a list
+        if (msg.includes('*') || msg.includes('\n')) {
+            const items = msg.split(/[*\n]+/).filter(item => item.trim() !== '');
+            finalContent = `<ul class="list-none space-y-2">
+                ${items.map(item => `<li class="flex gap-2"><span class="text-purple-600">▶</span> ${item.trim()}</li>`).join('')}
+            </ul>`;
+        } else {
+            finalContent = `<p class="leading-tight">${msg}</p>`;
+        }
+
+        msgDiv.innerHTML = `
+            <span class="block text-[10px] uppercase opacity-70 mb-2 font-black tracking-widest border-b-2 border-black pb-1">${type}</span>
+            <div>${finalContent}</div>
+        `;
+
+        museMessages.appendChild(msgDiv);
+        
+        // Smooth scroll to the latest message
+        museMessages.scrollTo({
+            top: museMessages.scrollHeight,
+            behavior: 'smooth'
+        });
+    }
+});
