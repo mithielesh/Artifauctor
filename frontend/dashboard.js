@@ -229,6 +229,7 @@ function performLogout() {
 // Attach Listeners on Load
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('nav-new-pipeline').addEventListener('click', () => window.location.href = 'workspace.html');
+    document.getElementById('nav-planalytics').addEventListener('click', () => window.location.href = 'planalytics.html');
     document.getElementById('nav-settings').addEventListener('click', toggleModal);
     document.getElementById('nav-logout').addEventListener('click', performLogout);
     

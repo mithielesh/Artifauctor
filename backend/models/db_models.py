@@ -1,7 +1,7 @@
 # backend/models/db_models.py
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Date, Boolean
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from database import Base
 
 class User(Base):
@@ -52,3 +52,27 @@ class ArticleHistory(Base):
     
     # Relationship back to the user
     owner = relationship("User", back_populates="articles")
+
+class AnalyticsHistory(Base):
+    """Stores daily snapshots of Dev.to and Hashnode performance."""
+    __tablename__ = "analytics_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    
+    # Use date.today directly!
+    recorded_date = Column(Date, default=date.today) 
+    
+    total_views = Column(Integer, default=0)
+    total_likes = Column(Integer, default=0)
+    total_comments = Column(Integer, default=0)
+
+class IdeaNote(Base):
+    __tablename__ = "idea_notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    title = Column(String, default="Untitled") # <--- NEW
+    content = Column(String)
+    is_bulleted = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.now)

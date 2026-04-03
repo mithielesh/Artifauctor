@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planning & Analytics - Artifauctor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Custom Brutalist Scrollbar for Notes */
+        .note-scroll::-webkit-scrollbar { width: 10px; }
+        .note-scroll::-webkit-scrollbar-track { background: transparent; border-left: 2px solid #111827; }
+        .note-scroll::-webkit-scrollbar-thumb { background: #111827; border: 1px solid #111827; }
+        .note-scroll::-webkit-scrollbar-thumb:hover { background: #374151; }
+        /* Neo-Brutalist base styles */
+        body { background-color: #f3f0ff; color: #111827; font-family: 'Courier New', Courier, monospace; }
+        .brutalist-btn { border: 2px solid #111827; box-shadow: 4px 4px 0px #111827; transition: all 0.2s; font-weight: bold; cursor: pointer; }
+        .brutalist-btn:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0px #111827; }
+        .brutalist-btn:active { transform: translate(4px, 4px); box-shadow: 0px 0px 0px #111827; }
+    </style>
+</head>
+<body class="p-8">
+
+    <div class="max-w-7xl mx-auto flex justify-between items-center mb-12 border-b-4 border-black pb-4">
+        <h1 class="text-3xl font-black uppercase tracking-tighter">Planning & Analytics</h1>
+        <nav class="flex gap-4">
+            <button id="nav-vault" class="brutalist-btn bg-gray-200 px-4 py-2 rounded">
+                ← The Vault
+            </button>
+            <button id="nav-logout" class="brutalist-btn bg-red-300 px-4 py-2 rounded text-gray-900">
+                Logout
+            </button>
+        </nav>
+    </div>
+
+    <div class="max-w-7xl mx-auto">
+        <div class="bg-white p-6 mb-8 border-4 border-black shadow-[8px_8px_0px_rgba(0,0,0,1)] rounded-xl relative">
+            <h2 class="text-2xl font-black mb-4 uppercase tracking-tight">Performance Pulse</h2>
+            
+            <div class="relative w-full h-[350px]">
+                
+                <canvas id="analyticsChart" class="hidden"></canvas>
+
+                <div id="empty-analytics-state" class="absolute inset-0 bg-white z-10 hidden flex-col items-center justify-center p-6 text-center border-4 border-black border-dashed">
+                    <h3 class="text-2xl font-black uppercase text-gray-800 tracking-tight">No Data Yet</h3>
+                    <p class="text-gray-600 font-bold mb-6">Publish your first article to unlock the Performance Pulse analytics engine.</p>
+                    <button onclick="window.location.href='workspace.html'" class="brutalist-btn bg-indigo-300 px-6 py-3 rounded font-black text-lg">
+                        Start a Pipeline
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="mt-12">
+            <div class="flex justify-between items-end mb-6 border-b-4 border-black pb-2">
+                <h2 class="text-3xl font-black uppercase tracking-tight">Writer's Scratchpad</h2>
+                <span id="note-counter" class="font-bold bg-black text-white px-3 py-1 rounded">0 / 9</span>
+            </div>
+            
+            <div id="notebook-grid" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                </div>
+
+            <div id="add-note-container" class="mt-8 bg-yellow-100 p-6 border-4 border-black rounded-xl shadow-[8px_8px_0px_rgba(0,0,0,1)]">
+                <input type="text" id="new-note-title" class="w-full bg-transparent border-2 border-black p-3 font-black text-xl placeholder-gray-600 mb-4 focus:outline-none" placeholder="Give your idea a title...">
+                <textarea id="new-note-text" rows="4" class="w-full bg-transparent border-2 border-black p-3 font-bold placeholder-gray-600 mb-4 focus:outline-none" placeholder="Jot down the details..."></textarea>
+                <div class="flex justify-between items-center">
+                    <label class="font-bold flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="note-is-bullet" class="w-5 h-5 accent-black">
+                        Format as Bullets
+                    </label>
+                    <button onclick="saveNote()" class="brutalist-btn bg-black text-white px-6 py-2 rounded font-bold">
+                        + Save Note
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="planalytics.js"></script>
+</body>
+</html>

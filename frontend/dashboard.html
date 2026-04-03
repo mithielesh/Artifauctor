@@ -6,6 +6,8 @@
     <title>The Vault - Artifauctor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
         body { background-color: #f3f0ff; font-family: 'Space Grotesk', sans-serif; overflow-x: hidden; }
         .mono { font-family: 'JetBrains Mono', monospace; }
@@ -52,7 +54,10 @@
                     + New Pipeline
                 </button>
                 <button id="nav-settings" class="brutalist-btn bg-gray-200 px-4 py-2 rounded">
-                    ⚙️ BYOK Settings
+                    BYOK Settings
+                </button>
+                <button id="nav-planalytics" class="brutalist-btn bg-purple-200 px-4 py-2 rounded">
+                    Planning & Analytics
                 </button>
                 <button id="nav-logout" class="brutalist-btn bg-red-300 px-4 py-2 rounded text-gray-900">
                     Logout

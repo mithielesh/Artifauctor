@@ -1,8 +1,11 @@
 # backend/api/routes.py
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 import logging
 import json
+from datetime import timedelta
+import datetime
 
 # New Database & Auth Imports
 from database import get_db
@@ -237,3 +240,103 @@ async def publish_from_vault(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/analytics", tags=["SaaS Features"])
+async def get_user_analytics(
+    db: Session = Depends(get_db), 
+    current_user: db_models.User = Depends(get_current_user)
+):
+    """Fetches live publishing and reaction metrics for the last 7 days."""
+    
+    # 1. Check if the user has EVER published an article
+    has_published = db.query(db_models.ArticleHistory).filter(
+        db_models.ArticleHistory.user_id == current_user.id,
+        db_models.ArticleHistory.status == 'Published'
+    ).first() is not None
+
+    # If they haven't published, we stop here and tell the frontend to show the Empty State
+    if not has_published:
+        return {"has_published": False}
+
+    # 2. Build the live 7-day timeline for the Chart
+    labels = []
+    reactions_data = []
+    published_data = []
+
+    today = datetime.date.today()
+    
+    # Loop backward from 6 days ago to today to get a perfect 7-day rolling window
+    for i in range(6, -1, -1):
+        target_date = today - timedelta(days=i)
+        labels.append(target_date.strftime("%b %d")) # e.g., "Apr 04"
+
+        # Count articles published on this exact date
+        # func.date() safely strips the time off the DB timestamp
+        pub_count = db.query(db_models.ArticleHistory).filter(
+            db_models.ArticleHistory.user_id == current_user.id,
+            db_models.ArticleHistory.status == 'Published',
+            func.date(db_models.ArticleHistory.created_at) == target_date
+        ).count()
+        published_data.append(pub_count)
+
+        # Get Reactions (Views + Likes) from the AnalyticsHistory table
+        stat = db.query(db_models.AnalyticsHistory).filter(
+            db_models.AnalyticsHistory.user_id == current_user.id,
+            db_models.AnalyticsHistory.recorded_date == target_date
+        ).first()
+
+        if stat:
+            reactions_data.append(stat.total_views + stat.total_likes)
+        else:
+            reactions_data.append(0)
+
+    # Return the exact payload the new Chart.js setup is expecting
+    return {
+        "has_published": True,
+        "labels": labels,
+        "datasets": {
+            "reactions": reactions_data,
+            "published": published_data
+        }
+    }
+
+@router.get("/notes", tags=["Notebook"])
+async def get_notes(db: Session = Depends(get_db), current_user: db_models.User = Depends(get_current_user)):
+    return db.query(db_models.IdeaNote).filter(db_models.IdeaNote.user_id == current_user.id).all()
+
+@router.post("/notes", tags=["Notebook"])
+async def create_note(request: schemas.NoteRequest, db: Session = Depends(get_db), current_user: db_models.User = Depends(get_current_user)):
+    count = db.query(db_models.IdeaNote).filter(db_models.IdeaNote.user_id == current_user.id).count()
+    if count >= 9:
+        return {"error": "Notebook full."}
+        
+    new_note = db_models.IdeaNote(
+        user_id=current_user.id, 
+        title=request.title, 
+        content=request.content, 
+        is_bulleted=request.is_bulleted
+    )
+    db.add(new_note)
+    db.commit()
+    db.refresh(new_note)
+    return new_note
+
+# --- NEW: The Edit Route ---
+@router.put("/notes/{note_id}", tags=["Notebook"])
+async def update_note(note_id: int, request: schemas.NoteRequest, db: Session = Depends(get_db), current_user: db_models.User = Depends(get_current_user)):
+    note = db.query(db_models.IdeaNote).filter(db_models.IdeaNote.id == note_id, db_models.IdeaNote.user_id == current_user.id).first()
+    if note:
+        note.title = request.title
+        note.content = request.content
+        note.is_bulleted = request.is_bulleted
+        db.commit()
+        return {"status": "updated"}
+    return {"error": "Note not found"}
+
+@router.delete("/notes/{note_id}", tags=["Notebook"])
+async def delete_note(note_id: int, db: Session = Depends(get_db), current_user: db_models.User = Depends(get_current_user)):
+    note = db.query(db_models.IdeaNote).filter(db_models.IdeaNote.id == note_id, db_models.IdeaNote.user_id == current_user.id).first()
+    if note:
+        db.delete(note)
+        db.commit()
+    return {"status": "deleted"}

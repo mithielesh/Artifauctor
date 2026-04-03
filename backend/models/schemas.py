@@ -74,3 +74,8 @@ class ArticleHistoryResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+class NoteRequest(BaseModel):
+    title: str
+    content: str
+    is_bulleted: bool
