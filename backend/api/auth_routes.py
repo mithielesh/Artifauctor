@@ -11,24 +11,32 @@ router = APIRouter()
 
 @router.post("/register", response_model=schemas.UserResponse)
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    # Check if user already exists
-    db_user = db.query(db_models.User).filter(db_models.User.email == user.email).first()
+    # 1. THE PROFESSIONAL FIX: Normalize the email (lowercase & remove accidental spaces)
+    clean_email = user.email.strip().lower()
+
+    # Check if user already exists using the clean email
+    db_user = db.query(db_models.User).filter(db_models.User.email == clean_email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Create new user
+    # Create new user saving ONLY the clean email
     hashed_password = get_password_hash(user.password)
-    new_user = db_models.User(email=user.email, hashed_password=hashed_password)
+    new_user = db_models.User(email=clean_email, hashed_password=hashed_password)
     
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     return new_user
 
+
 @router.post("/login", response_model=schemas.Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # OAuth2 specifies 'username', but we are using email in that field
-    user = db.query(db_models.User).filter(db_models.User.email == form_data.username).first()
+    # 1. THE PROFESSIONAL FIX: Normalize the incoming login attempt
+    clean_email = form_data.username.strip().lower()
+
+    # Look up the user using the clean email
+    user = db.query(db_models.User).filter(db_models.User.email == clean_email).first()
+    
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
