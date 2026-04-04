@@ -13,8 +13,11 @@ from services.publisher import publish_to_devto, publish_to_hashnode
 def db_maintenance_job():
     """Runs periodically to publish scheduled drafts and flag decaying content."""
     db: Session = SessionLocal()
-    # Always use UTC to match our database timestamps perfectly
-    now = datetime.now(timezone.utc)
+    
+    # THE TIMEZONE FIX: 
+    # Get current UTC time, but strip the timezone info so it becomes "naive".
+    # This allows it to perfectly compare against SQLite's naive datetime columns.
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     
     try:
         # --- 1. THE ASYNCHRONOUS SCHEDULER ---
