@@ -7,7 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
         body { background-color: #f3f0ff; font-family: 'Space Grotesk', sans-serif; overflow-x: hidden; }
         .mono { font-family: 'JetBrains Mono', monospace; }
@@ -20,14 +19,8 @@
         .brutalist-btn:active { transform: translate(4px, 4px); box-shadow: 0px 0px 0px #111827; }
         
         .modal-overlay { background-color: rgba(17, 24, 39, 0.8); backdrop-filter: blur(4px); }
-        
-        /* DYNAMIC STATUS BADGES */
-        .badge-draft { background-color: #fef08a; border: 2px solid #111827; color: #854d0e; }
         .badge-published { background-color: #86efac; border: 2px solid #111827; color: #166534; }
-        .badge-scheduled { background-color: #e9d5ff; border: 2px solid #111827; color: #6b21a8; }
-        .badge-stale { background-color: #fca5a5; border: 2px solid #111827; color: #991b1b; }
 
-        /* Brutalist Toasts */
         .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 60; display: flex; flex-direction: column; gap: 10px; }
         .brutalist-toast { 
             border: 3px solid #111827; box-shadow: 4px 4px 0px #111827; border-radius: 8px; 
@@ -38,47 +31,13 @@
         .toast-error { background-color: #fca5a5; color: #111827; }
         .toast-show { transform: translateX(0); }
 
-        /* The Muse: High-Voltage Neo-Brutalism */
-        #muse-trigger {
-            background: #A855F7; /* Electric Purple */
-            border: 5px solid #000;
-            box-shadow: 6px 6px 0px #000;
-            transition: all 0.1s font-weight;
-        }
-
-        #muse-trigger:hover {
-            transform: translate(-2px, -2px);
-            box-shadow: 8px 8px 0px #000;
-            background: #BCFB2D; /* Hits a lime green on hover for that 'clash' aesthetic */
-        }
-
-        #muse-trigger:active {
-            transform: translate(4px, 4px);
-            box-shadow: 0px 0px 0px #000;
-        }
-
-        #muse-chat {
-            border: 6px solid #000;
-            box-shadow: 15px 15px 0px #000;
-            background: #fff;
-        }
-
-        /* Hard-edged header */
-        .muse-header {
-            background: #000;
-            color: #fff;
-            padding: 10px;
-            font-family: 'Black Ops One', system-ui; /* Or your chosen heavy font */
-            letter-spacing: -1px;
-        }
-
-        /* The Input Field - No rounded corners allowed here */
-        #muse-input {
-            border: 4px solid #000;
-            background: #fff;
-            padding: 10px;
-            font-weight: 900;
-        }
+        /* The Muse */
+        #muse-trigger { background: #A855F7; border: 5px solid #000; box-shadow: 6px 6px 0px #000; transition: all 0.1s font-weight; }
+        #muse-trigger:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0px #000; background: #BCFB2D; }
+        #muse-trigger:active { transform: translate(4px, 4px); box-shadow: 0px 0px 0px #000; }
+        #muse-chat { border: 6px solid #000; box-shadow: 15px 15px 0px #000; background: #fff; }
+        .muse-header { background: #000; color: #fff; padding: 10px; font-family: 'Black Ops One', system-ui; letter-spacing: -1px; }
+        #muse-input { border: 4px solid #000; background: #fff; padding: 10px; font-weight: 900; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -92,14 +51,17 @@
                 <span class="bg-indigo-200 border-2 border-gray-900 font-bold px-2 py-1 text-xs rounded uppercase">The Vault</span>
             </div>
             <div class="flex gap-4">
+                <button id="nav-active-workspaces" class="brutalist-btn bg-yellow-300 px-4 py-2 rounded text-black">
+                    Active Workspaces
+                </button>
                 <button id="nav-new-pipeline" class="brutalist-btn bg-indigo-300 px-4 py-2 rounded">
                     + New Pipeline
                 </button>
-                <button id="nav-settings" class="brutalist-btn bg-gray-200 px-4 py-2 rounded">
-                    BYOK Settings
-                </button>
                 <button id="nav-planalytics" class="brutalist-btn bg-purple-200 px-4 py-2 rounded">
                     Planning & Analytics
+                </button>
+                <button id="nav-settings" class="brutalist-btn bg-gray-200 px-4 py-2 rounded">
+                    BYOK Settings
                 </button>
                 <button id="nav-logout" class="brutalist-btn bg-red-300 px-4 py-2 rounded text-gray-900">
                     Logout
@@ -111,19 +73,12 @@
     <main class="flex-grow p-8 max-w-7xl mx-auto w-full">
         <div class="mb-8 border-b-2 border-gray-900 pb-4">
             <h2 class="text-4xl font-black text-gray-900 tracking-tight" id="welcome-message">Initializing...</h2>
-            <p class="text-gray-600 font-bold mt-2 uppercase text-sm tracking-widest mono" id="welcome-subtext">Connecting to secure database</p>
+            <p class="text-gray-600 font-bold mt-2 uppercase text-sm tracking-widest mono" id="welcome-subtext">Immutable Published Records</p>
         </div>
 
         <div id="history-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             </div>
     </main>
-
-    <footer class="border-t-4 border-gray-900 bg-white p-6 mt-auto">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <div class="font-black text-xl tracking-tighter">ARTIFAUCTOR</div>
-            <div class="mono text-xs font-bold text-gray-500 uppercase tracking-widest">Enterprise Content Pipeline v2.0</div>
-        </div>
-    </footer>
 
     <div id="settings-modal" class="fixed inset-0 modal-overlay z-50 items-center justify-center hidden flex">
         <div class="brutalist-card max-w-2xl w-full mx-4 p-8 rounded-xl max-h-[90vh] overflow-y-auto">
@@ -131,70 +86,38 @@
                 <h2 class="text-3xl font-black">Workspace Configuration</h2>
                 <button id="modal-close" class="text-3xl font-black hover:text-red-500">&times;</button>
             </div>
-
             <form id="settings-form" class="space-y-6">
                 <div class="bg-indigo-50 border-2 border-gray-900 p-4 rounded mb-6">
                     <p class="text-sm font-bold text-gray-700">Keys are encrypted and stored in your isolated database profile.</p>
                 </div>
-
-                <div>
-                    <label class="block text-sm font-bold uppercase mb-1">Gemini API Key</label>
-                    <input id="set-gemini" type="password" class="brutalist-input w-full p-3 rounded mono" placeholder="AIzaSy...">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-bold uppercase mb-1">Dev.to API Key</label>
-                    <input id="set-devto" type="password" class="brutalist-input w-full p-3 rounded mono" placeholder="...">
-                </div>
-
+                <div><label class="block text-sm font-bold uppercase mb-1">Gemini API Key</label><input id="set-gemini" type="password" class="brutalist-input w-full p-3 rounded mono" placeholder="AIzaSy..."></div>
+                <div><label class="block text-sm font-bold uppercase mb-1">Dev.to API Key</label><input id="set-devto" type="password" class="brutalist-input w-full p-3 rounded mono" placeholder="....."></div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-bold uppercase mb-1">Hashnode Token</label>
-                        <input id="set-hashnode" type="password" class="brutalist-input w-full p-3 rounded mono" placeholder="...">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold uppercase mb-1">Hashnode Pub ID</label>
-                        <input id="set-hashnode-pub" type="text" class="brutalist-input w-full p-3 rounded mono" placeholder="...">
-                    </div>
+                    <div><label class="block text-sm font-bold uppercase mb-1">Hashnode Token</label><input id="set-hashnode" type="password" class="brutalist-input w-full p-3 rounded mono" placeholder="....."></div>
+                    <div><label class="block text-sm font-bold uppercase mb-1">Hashnode Pub ID</label><input id="set-hashnode-pub" type="text" class="brutalist-input w-full p-3 rounded mono" placeholder="....."></div>
                 </div>
-
-                <div>
-                    <label class="block text-sm font-bold uppercase mb-1">Brand Voice Profile (Agent 0)</label>
-                    <p class="text-xs text-gray-500 mb-2 font-medium">Paste 2-3 paragraphs of your best writing. The AI will mimic this tone.</p>
-                    <textarea id="set-brand-voice" class="brutalist-input w-full p-3 rounded h-32" placeholder="My writing style is usually punchy and technical..."></textarea>
-                </div>
-
-                <button type="submit" class="brutalist-btn w-full bg-emerald-300 py-3 rounded text-lg uppercase tracking-wider">
-                    Save Configuration
-                </button>
+                <div><label class="block text-sm font-bold uppercase mb-1">Brand Voice Profile</label><textarea id="set-brand-voice" class="brutalist-input w-full p-3 rounded h-32" placeholder="My writing style is usually punchy and technical..."></textarea></div>
+                <button type="submit" class="brutalist-btn w-full bg-emerald-300 py-3 rounded text-lg uppercase tracking-wider">Save Configuration</button>
             </form>
         </div>
     </div>
-    <div id="muse-container" class="fixed bottom-8 left-8 z-50">
-        <button id="muse-trigger" class="w-16 h-16 rounded-full flex items-center justify-center text-3xl hover:scale-110 active:translate-y-1 active:shadow-none transition-all animate-bounce">
-            ✨
-        </button>
 
+    <div id="muse-container" class="fixed bottom-8 left-8 z-50">
+        <button id="muse-trigger" class="w-16 h-16 rounded-full flex items-center justify-center text-3xl hover:scale-110 active:translate-y-1 active:shadow-none transition-all animate-bounce">✨</button>
         <div id="muse-chat" class="hidden absolute bottom-24 left-0 w-80 rounded-xl flex flex-col overflow-hidden">
-            <div class="muse-header flex justify-between items-center">
-                <span class="text-xs font-black uppercase">MUSE THE IDEA BOT</span>
-                <button id="close-muse" class="brutalist-btn bg-red-400 text-black px-2 py-1 text-[10px] font-black uppercase tracking-tighter">
-                    Close
-                </button>
+            <div class="muse-header flex justify-between items-center bg-black p-2 border-b-4 border-black">
+                <span class="text-[10px] font-black uppercase tracking-widest text-white">MUSE THE IDEA BOT</span>
+                <button id="close-muse" class="brutalist-btn bg-red-400 text-black px-2 py-1 text-[10px] font-black uppercase tracking-tighter">Close</button>
             </div>
-            
             <div id="muse-messages" class="h-64 overflow-y-auto p-4 space-y-4 bg-purple-50 font-bold text-sm note-scroll">
-                <div class="bg-white border-4 border-black p-2 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-                    <span class="block text-[10px] uppercase opacity-50 mb-1">RESPONSE</span>
-                    The Vault is full of echoes. Need a new sound? Ask me for an idea.
+                <div class="bg-white border-4 border-black p-2 shadow-[4px_4px_0px_rgba(0,0,0,1)] mr-auto ml-2 w-fit max-w-[85%] text-sm font-bold mb-4">
+                    <span class="block text-[10px] uppercase opacity-70 mb-2 font-black tracking-widest border-b-2 border-black pb-1">RESPONSE</span>
+                    <p class="leading-tight">The Vault is full of echoes. Need a new sound? Ask me for an idea.</p>
                 </div>
             </div>
-
             <div class="p-3 border-t-4 border-black bg-white">
                 <textarea id="muse-input" rows="2" class="w-full text-sm font-bold focus:outline-none resize-none placeholder-gray-400" placeholder="Ask for a headline..."></textarea>
-                <button id="send-muse" class="brutalist-btn w-full mt-2 bg-purple-300 py-2 uppercase text-xs font-black tracking-widest">
-                    Ignite Spark
-                </button>
+                <button id="send-muse" class="brutalist-btn w-full mt-2 bg-purple-300 py-2 uppercase text-xs font-black tracking-widest">Ignite Spark</button>
             </div>
         </div>
     </div>

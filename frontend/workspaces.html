@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Active Workspaces - Artifauctor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #fcfbf9; font-family: 'Space Grotesk', sans-serif; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .brutalist-card { border: 3px solid #111827; box-shadow: 6px 6px 0px #111827; background: #ffffff; transition: all 0.2s ease; }
+        .brutalist-card:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0px #111827; }
+        .brutalist-btn { border: 2px solid #111827; box-shadow: 4px 4px 0px #111827; transition: all 0.2s; font-weight: bold; cursor: pointer; }
+        .brutalist-btn:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0px #111827; }
+        .brutalist-btn:active { transform: translate(4px, 4px); box-shadow: 0px 0px 0px #111827; }
+        .badge-draft { background-color: #fef08a; border: 2px solid #111827; color: #854d0e; }
+        .badge-scheduled { background-color: #e9d5ff; border: 2px solid #111827; color: #6b21a8; }
+        
+        /* Modal Background Blur */
+        .modal-overlay { background-color: rgba(17, 24, 39, 0.85); backdrop-filter: blur(4px); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <div id="toast-container" class="fixed bottom-10 right-8 z-50 flex flex-col gap-2"></div>
+
+    <nav class="border-b-4 border-gray-900 bg-white p-4 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <h1 class="text-3xl font-black tracking-tighter">ARTIFAUCTOR</h1>
+                <span class="bg-yellow-300 border-2 border-gray-900 font-bold px-2 py-1 text-xs rounded uppercase text-black">Active Workspaces</span>
+            </div>
+            <div class="flex gap-4">
+                <button id="nav-vault" class="brutalist-btn bg-indigo-200 px-4 py-2 rounded">← The Vault</button>
+                <button id="nav-logout" class="brutalist-btn bg-red-300 px-4 py-2 rounded text-gray-900">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow p-8 max-w-7xl mx-auto w-full">
+        <div class="mb-10 bg-indigo-50 border-4 border-black p-8 shadow-[8px_8px_0px_#111827] flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div>
+                <h2 class="text-3xl font-black uppercase tracking-tight">Project Command Center</h2>
+                <p class="text-gray-600 font-bold mt-1 text-sm mono">Manage drafts, edits, and scheduled deployments.</p>
+            </div>
+            <button id="launch-pipeline" class="brutalist-btn bg-indigo-500 text-white px-8 py-4 text-xl uppercase tracking-widest hover:bg-indigo-600">
+                + Launch New Workspace
+            </button>
+        </div>
+
+        <div id="active-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            </div>
+    </main>
+
+    <div id="delete-modal" class="fixed inset-0 modal-overlay z-50 items-center justify-center hidden">
+        <div class="brutalist-card max-w-md w-full mx-4 p-8 rounded-xl flex flex-col items-center text-center transform transition-all scale-95 opacity-0" id="delete-modal-content">
+            
+            <div class="w-16 h-16 bg-red-100 border-4 border-black rounded-full flex items-center justify-center mb-6 shadow-[4px_4px_0px_#000]">
+                <span class="text-3xl">!</span>
+            </div>
+            
+            <h2 class="text-3xl font-black uppercase mb-2 text-red-600">Destroy Draft?</h2>
+            <p class="text-gray-700 font-bold mb-8 text-sm leading-relaxed">
+                This action is permanent. The AI context, generated content, and scheduled deployments will be instantly purged from the database.
+            </p>
+            
+            <div class="flex gap-4 w-full">
+                <button id="cancel-delete-btn" class="brutalist-btn bg-white text-black flex-1 py-3 uppercase tracking-widest text-sm hover:bg-gray-100">
+                    Cancel
+                </button>
+                <button id="confirm-delete-btn" class="brutalist-btn bg-red-500 text-white flex-1 py-3 uppercase tracking-widest text-sm hover:bg-red-600 active:bg-red-700">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="workspaces.js"></script>
+</body>
+</html>

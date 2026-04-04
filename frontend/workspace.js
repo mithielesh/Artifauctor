@@ -1,27 +1,17 @@
 const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
 
-// --- 1. Security Gate (The Bouncer) ---
+// --- 1. Security & State ---
 const token = localStorage.getItem('artifauctor_token');
-if (!token) {
-    window.location.href = 'error.html?code=401';
-}
+if (!token) window.location.href = 'error.html?code=401';
 
-// Global state for HITL deployment
-let currentBlogData = { 
-    title: "", 
-    content: "" 
-};
+let currentWorkspaceId = null;
+let lastSavedContent = "";
+let isSaving = false;
+let isReadOnlyMode = false; // Tracks if we are in the Vault Viewer
 
 // --- 2. Custom Toast System ---
 function showToast(message, type = 'success') {
     let container = document.getElementById('toast-container');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'toast-container';
-        container.className = 'fixed bottom-5 right-5 z-50 flex flex-col gap-2';
-        document.body.appendChild(container);
-    }
-    
     const toast = document.createElement('div');
     const bgColor = type === 'success' ? '#86efac' : '#fca5a5';
     toast.style.cssText = `
@@ -30,12 +20,10 @@ function showToast(message, type = 'success') {
         min-width: 300px; transform: translateX(120%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         background-color: ${bgColor}; color: #111827;
     `;
-    
     toast.innerHTML = `
         <span>${message}</span>
         <button type="button" onclick="this.parentElement.style.transform='translateX(120%)'; setTimeout(()=>this.parentElement.remove(), 300)" class="ml-4 font-black text-xl leading-none">&times;</button>
     `;
-    
     container.appendChild(toast);
     setTimeout(() => toast.style.transform = 'translateX(0)', 10);
     setTimeout(() => {
@@ -44,267 +32,335 @@ function showToast(message, type = 'success') {
     }, 4000);
 }
 
-// --- 3. Main Initialization ---
-document.addEventListener('DOMContentLoaded', () => {
-    // Nav Listeners
-    document.getElementById('nav-vault').addEventListener('click', () => window.location.href = 'dashboard.html');
-    document.getElementById('nav-logout').addEventListener('click', () => {
-        localStorage.removeItem('artifauctor_token');
-        window.location.href = 'auth.html';
+async function fetchWithAuth(url, options = {}) {
+    const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...options.headers
+    };
+    const response = await fetch(url, { ...options, headers });
+    if (response.status === 401) window.location.href = 'auth.html';
+    return response;
+}
+
+// --- 3. Initialization & Routing ---
+document.addEventListener('DOMContentLoaded', async () => {
+    document.getElementById('nav-workspaces').addEventListener('click', () => {
+        // If we are in read-only mode, the back button should take us to the Vault, not Active Workspaces
+        if (isReadOnlyMode) {
+            window.location.href = 'dashboard.html';
+        } else {
+            window.location.href = 'workspaces.html';
+        }
     });
 
-    const generateBtn = document.getElementById('generateBtn');
-    const keywordInput = document.getElementById('keywordInput');
+    // Check URL parameters for ID and ReadOnly flag
+    const urlParams = new URLSearchParams(window.location.search);
+    const draftId = urlParams.get('id');
+    isReadOnlyMode = urlParams.get('readonly') === 'true';
 
-    if (!generateBtn || !keywordInput) {
-        console.error("Critical UI elements missing. Check HTML IDs.");
-        return;
+    if (isReadOnlyMode) {
+        // Change the back button text if we came from the Vault
+        document.getElementById('nav-workspaces').innerText = '← Return to Vault';
     }
 
-    // --- MAIN EXECUTION PIPELINE ---
-    generateBtn.addEventListener('click', async () => {
-        const keyword = keywordInput.value.trim();
-        const domainSelect = document.getElementById('domainSelect');
-        const autoPublishToggle = document.getElementById('autoPublish');
-        const scheduleInput = document.getElementById('scheduleInput'); // <-- New Date Capture
-        
-        const domain = domainSelect ? domainSelect.value : "General";
-        const autoPublish = autoPublishToggle ? autoPublishToggle.checked : false;
-        const scheduledFor = scheduleInput && scheduleInput.value ? scheduleInput.value : null; // <-- Value check
-        
-        const loadingState = document.getElementById('loadingState');
-        const loadingText = document.getElementById('loadingText');
-        const resultsSection = document.getElementById('resultsSection');
-        const stagingArea = document.getElementById('stagingArea');
-        const socialContainer = document.getElementById('social-container');
+    if (draftId) {
+        await loadExistingWorkspace(draftId);
+    }
 
-        if (!keyword) {
-            showToast('CRITICAL: Keyword required for SERP analysis.', 'error');
+    // --- PIPELINE GENERATOR (New Workspace) ---
+    document.getElementById('generateBtn').addEventListener('click', async () => {
+        const wsName = document.getElementById('wsNameInput').value.trim();
+        const keyword = document.getElementById('keywordInput').value.trim();
+        const domain = document.getElementById('domainSelect').value;
+        const rawSchedule = document.getElementById('scheduleInput').value;
+        
+        let scheduleInput = null;
+        if (rawSchedule) {
+            scheduleInput = new Date(rawSchedule).toISOString(); 
+        }
+        
+        if (!wsName || !keyword) {
+            showToast('CRITICAL: Workspace Name and Keyword are required.', 'error');
             return;
         }
 
-        // UI Reset
-        if (resultsSection) resultsSection.classList.add('hidden');
-        if (stagingArea) stagingArea.classList.add('hidden');
-        if (socialContainer) socialContainer.classList.add('hidden');
-        if (loadingState) loadingState.classList.remove('hidden');
-        generateBtn.disabled = true;
+        switchView('loading');
         
-        const loadingMessages = [
-            "Authenticating Workspace...",
-            "Initializing SERP Scraper...",
-            "Agent 1: Analyzing Competitor Gaps...",
-            "Agent 2: Executing PAS Framework...",
-            "Validator: Running SEO Heuristics...",
-            "Saving Artifact to Vault..."
-        ];
-        
-        let messageIndex = 0;
-        const messageInterval = setInterval(() => {
-            messageIndex = (messageIndex + 1) % loadingMessages.length;
-            if (loadingText) loadingText.textContent = loadingMessages[messageIndex];
-        }, 2000);
-
         try {
-            const response = await fetch(`${API_BASE_URL}/generate`, {
+            const response = await fetchWithAuth(`${API_BASE_URL}/generate`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}` 
-                },
-                // Pass scheduled_for to the backend
                 body: JSON.stringify({ 
+                    workspace_name: wsName,
                     keyword: keyword, 
                     domain: domain,
-                    scheduled_for: scheduledFor 
+                    scheduled_for: scheduleInput 
                 })
             });
 
-            if (response.status === 401) {
-                window.logoutUser();
-                throw new Error("Session Expired");
-            }
-            if (!response.ok) throw new Error(`Backend Pipeline Fault: ${response.statusText}`);
-
+            if (!response.ok) throw new Error("Generation failed.");
+            
             const data = await response.json();
 
-            // Cache data for Publishing
-            currentBlogData.title = `The Future of ${data.keyword}: A ${data.domain} Deep-Dive`;
-            currentBlogData.content = data.blog_content;
-
-            // Render Blog & Outline
-            document.getElementById('outlineOutput').innerHTML = marked.parse(data.outline || "No outline generated.");
-            document.getElementById('blogOutput').innerHTML = marked.parse(data.blog_content || "No content generated.");
-
-            // Populate Metrics
-            document.getElementById('uiSeoScore').textContent = data.seo_score;
-            document.getElementById('uiNaturalness').textContent = (data.naturalness || 0) + '%';
-            document.getElementById('uiReadability').textContent = data.readability_level || "--";
+            const wsRes = await fetchWithAuth(`${API_BASE_URL}/workspaces/active`);
+            const activeWs = await wsRes.json();
+            const thisWs = activeWs.find(w => w.workspace_name === wsName);
             
-            const uiSnippet = document.getElementById('uiSnippet');
-            if (uiSnippet) {
-                uiSnippet.textContent = data.snippet_readiness || "Low";
-                uiSnippet.className = data.snippet_readiness === "High" 
-                    ? "metric-value text-green-600 font-bold" 
-                    : "metric-value text-yellow-600 font-bold";
-            }
-
-            // --- SOCIAL MEDIA SPINOFF RENDERING ---
-            if (data.twitter_thread && data.linkedin_post) {
-                document.getElementById('twitter-text').innerText = data.twitter_thread;
-                document.getElementById('linkedin-text').innerText = data.linkedin_post;
-                
-                // Show the Promo Trigger, hide the cards initially
-                const promoTrigger = document.getElementById('promo-trigger');
-                const promoCards = document.getElementById('promo-cards');
-                if(promoTrigger) promoTrigger.classList.remove('hidden');
-                if(promoCards) promoCards.classList.add('hidden');
-
-                if(socialContainer) socialContainer.classList.remove('hidden');
-            }
-
-            // Transition UI
-            clearInterval(messageInterval);
-            if(loadingState) loadingState.classList.add('hidden');
-            if(resultsSection) resultsSection.classList.remove('hidden');
-            
-            // --- NEW: SCHEDULED VS AUTO-PUBLISH UX ---
-            if (scheduledFor) {
-                const dateStr = new Date(scheduledFor).toLocaleString();
-                showToast(`Artifact Saved and SCHEDULED for ${dateStr}`, 'success');
-                if (stagingArea) {
-                    stagingArea.classList.remove('hidden');
-                    resetPublishCards("SCHEDULED"); // Triggers the Purple Badge
-                }
+            if(thisWs) {
+                currentWorkspaceId = thisWs.id;
+                initializeStudio(thisWs.workspace_name, data.blog_content, data.seo_score, data.naturalness, data.twitter_thread, data.linkedin_post, data.summary);
             } else {
-                showToast('Pipeline execution complete. Artifact saved to Vault.', 'success');
-                if (autoPublish && stagingArea) {
-                    stagingArea.classList.remove('hidden');
-                    resetPublishCards("AWAITING"); // Triggers the Yellow Badge
-                }
+                throw new Error("Workspace mismatch error.");
             }
 
         } catch (error) {
-            console.error('System Error:', error);
-            clearInterval(messageInterval);
-            if (loadingState) loadingState.classList.add('hidden');
-            showToast('PIPELINE ERROR: ' + error.message, 'error');
-        } finally {
-            generateBtn.disabled = false;
+            switchView('setup');
+            showToast('ERROR: ' + error.message, 'error');
         }
     });
+
+    // --- AI CORRECTION ENGINE ---
+    document.getElementById('applyCorrectionBtn').addEventListener('click', async () => {
+        if (!currentWorkspaceId || isReadOnlyMode) return;
+        const instruction = document.getElementById('correctionInput').value.trim();
+        if (!instruction) return;
+
+        const btn = document.getElementById('applyCorrectionBtn');
+        const canvas = document.getElementById('editorCanvas');
+        
+        btn.innerText = "Processing...";
+        btn.disabled = true;
+        canvas.style.opacity = "0.5";
+
+        try {
+            const res = await fetchWithAuth(`${API_BASE_URL}/workspaces/${currentWorkspaceId}/correct`, {
+                method: 'POST',
+                body: JSON.stringify({ instruction, current_content: canvas.value })
+            });
+            if (!res.ok) throw new Error("Correction failed.");
+            
+            const data = await res.json();
+            canvas.value = data.content; 
+            lastSavedContent = data.content; 
+            document.getElementById('correctionInput').value = ""; 
+            showToast("Correction Applied!", "success");
+        } catch (e) {
+            showToast("Failed to apply correction.", "error");
+        } finally {
+            btn.innerText = "Apply Correction";
+            btn.disabled = false;
+            canvas.style.opacity = "1";
+        }
+    });
+
+    // --- MARKDOWN PREVIEW TOGGLE ---
+    document.getElementById('previewToggleBtn').addEventListener('click', function() {
+        if (isReadOnlyMode) return; // Disable toggle if frozen
+        
+        const editor = document.getElementById('editorCanvas');
+        const preview = document.getElementById('previewCanvas');
+        const btn = document.getElementById('previewToggleBtn');
+        const rightPanel = document.getElementById('rightControlPanel'); 
+
+        if (preview.classList.contains('hidden')) {
+            preview.innerHTML = marked.parse(editor.value); 
+            editor.classList.add('hidden');
+            preview.classList.remove('hidden');
+            rightPanel.classList.add('hidden'); 
+            
+            btn.innerText = "Edit Mode";
+            btn.classList.replace('bg-blue-200', 'bg-yellow-200');
+            btn.classList.replace('hover:bg-blue-300', 'hover:bg-yellow-300');
+        } else {
+            preview.classList.add('hidden');
+            editor.classList.remove('hidden');
+            rightPanel.classList.remove('hidden'); 
+            
+            btn.innerText = "Preview Mode";
+            btn.classList.replace('bg-yellow-200', 'bg-blue-200');
+            btn.classList.replace('hover:bg-yellow-300', 'hover:bg-blue-300');
+        }
+    });
+
+    document.getElementById('manualSaveBtn').addEventListener('click', forceSave);
+    
+    // Only start Auto-Save if NOT in read-only mode
+    if (!isReadOnlyMode) {
+        setInterval(autoSaveTrigger, 5000);
+    }
 });
 
-// --- HITL Deployment Functions ---
-window.approvePublish = async function(platform) {
-    const statusEl = document.getElementById(`${platform}Status`);
-    const linkEl = document.getElementById(`${platform}Link`);
-    if (!statusEl || !linkEl) return;
+// --- CORE STUDIO FUNCTIONS ---
 
-    statusEl.textContent = "DEPLOYING...";
-    statusEl.className = "text-[9px] bg-blue-100 px-2 py-1 border border-blue-500 font-black animate-pulse uppercase tracking-widest";
+async function loadExistingWorkspace(id) {
+    try {
+        // THIS IS THE FIX: If readonly is true, fetch from the Vault. Otherwise, fetch Active.
+        const endpoint = isReadOnlyMode ? `${API_BASE_URL}/workspaces/vault` : `${API_BASE_URL}/workspaces/active`;
+        const res = await fetchWithAuth(endpoint);
+        const workspaces = await res.json();
+        const ws = workspaces.find(w => w.id == id);
+        
+        if (!ws) {
+            showToast("Workspace not found.", "error");
+            setTimeout(() => window.location.href = isReadOnlyMode ? "dashboard.html" : "workspaces.html", 2000);
+            return;
+        }
+
+        currentWorkspaceId = ws.id;
+        initializeStudio(ws.workspace_name, ws.content, ws.seo_score, ws.naturalness, ws.twitter_thread, ws.linkedin_post, ws.summary);
+    } catch (e) {
+        showToast("Error loading workspace.", "error");
+    }
+}
+
+function initializeStudio(name, content, seo, naturalness, twitter, linkedin, summary) {
+    document.getElementById('headerWorkspaceName').innerText = name;
+    document.getElementById('editorCanvas').value = content || "";
+    lastSavedContent = content || "";
+    
+    document.getElementById('outlineOutput').innerHTML = `
+        <div class="bg-indigo-50 border border-indigo-200 p-3 text-indigo-900 font-medium shadow-[2px_2px_0px_#1f2937]">
+            <span class="block text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-1">RAG-Lite Summary</span>
+            ${summary || "No context summary generated."}
+        </div>
+    `;
+
+    document.getElementById('uiSeoScore').innerText = seo || "--";
+    document.getElementById('uiNaturalness').innerText = (naturalness && naturalness !== "--") ? `${naturalness}%` : "--";
+
+    if (twitter && linkedin) {
+        document.getElementById('social-container').classList.remove('hidden');
+        document.getElementById('twitter-text').innerText = twitter;
+        document.getElementById('linkedin-text').innerText = linkedin;
+    }
+
+    // --- APPLY FROZEN STATE IF READ ONLY ---
+    if (isReadOnlyMode) {
+        const editor = document.getElementById('editorCanvas');
+        const preview = document.getElementById('previewCanvas');
+        const rightPanel = document.getElementById('rightControlPanel'); 
+        const badge = document.getElementById('headerStatusBadge');
+        const saveArea = document.getElementById('saveStatus').parentElement.parentElement; 
+
+        // Force Preview Mode permanently
+        preview.innerHTML = marked.parse(content || ""); 
+        editor.classList.add('hidden');
+        preview.classList.remove('hidden');
+        
+        // Hide Controls
+        rightPanel.classList.add('hidden'); 
+        document.getElementById('previewToggleBtn').classList.add('hidden');
+        document.getElementById('manualSaveBtn').classList.add('hidden');
+        saveArea.classList.add('hidden');
+
+        // Update Badge to show it's frozen
+        badge.innerText = "PUBLISHED ARTIFACT";
+        badge.className = "inline-block mt-1 px-2 py-0.5 text-[10px] bg-blue-200 border border-black font-bold uppercase mono";
+    }
+
+    switchView('studio');
+}
+
+function switchView(view) {
+    document.getElementById('setupView').classList.add('hidden');
+    document.getElementById('loadingState').classList.add('hidden');
+    document.getElementById('studioView').classList.add('hidden');
+
+    if (view === 'setup') document.getElementById('setupView').classList.remove('hidden');
+    if (view === 'loading') document.getElementById('loadingState').classList.remove('hidden');
+    if (view === 'studio') {
+        document.getElementById('studioView').classList.remove('hidden');
+        document.getElementById('studioView').classList.add('flex');
+    }
+}
+
+// --- SAVE & SYNC LOGIC ---
+async function forceSave() {
+    if (!currentWorkspaceId || isSaving || isReadOnlyMode) return;
+    const currentContent = document.getElementById('editorCanvas').value;
+    await syncToDatabase(currentContent);
+}
+
+async function autoSaveTrigger() {
+    if (!currentWorkspaceId || isSaving || isReadOnlyMode) return;
+    if (!document.getElementById('previewCanvas').classList.contains('hidden')) return;
+
+    const currentContent = document.getElementById('editorCanvas').value;
+    if (currentContent !== lastSavedContent) {
+        await syncToDatabase(currentContent);
+    }
+}
+
+async function syncToDatabase(content) {
+    isSaving = true;
+    const saveDot = document.getElementById('saveDot');
+    const saveStatus = document.getElementById('saveStatus');
+
+    saveDot.className = "w-3 h-3 bg-yellow-400 border border-black rounded-full !important animate-pulse";
+    saveStatus.innerText = "SAVING...";
 
     try {
-        const response = await fetch(`${API_BASE_URL}/publish/${platform}`, {
+        const res = await fetchWithAuth(`${API_BASE_URL}/workspaces/${currentWorkspaceId}/save`, {
+            method: 'PUT',
+            body: JSON.stringify({ content: content })
+        });
+        
+        if (res.ok) {
+            lastSavedContent = content;
+            saveDot.className = "w-3 h-3 bg-green-400 border border-black rounded-full !important";
+            saveStatus.innerText = "SYNCED";
+        } else {
+            throw new Error("Sync failed");
+        }
+    } catch (e) {
+        saveDot.className = "w-3 h-3 bg-red-400 border border-black rounded-full !important";
+        saveStatus.innerText = "ERROR";
+    } finally {
+        isSaving = false;
+    }
+}
+
+// --- DEPLOYMENT LOGIC ---
+window.approvePublish = async function(platform) {
+    if (!currentWorkspaceId || isReadOnlyMode) return;
+    
+    await forceSave();
+
+    showToast(`Deploying to ${platform}...`, 'success');
+    
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/publish/${platform}/${currentWorkspaceId}`, {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}` 
-            },
             body: JSON.stringify({
-                title: currentBlogData.title,
-                content: currentBlogData.content
+                title: document.getElementById('headerWorkspaceName').innerText,
+                content: document.getElementById('editorCanvas').value
             })
         });
 
         const result = await response.json();
         if (result.url) {
-            statusEl.textContent = "LIVE";
-            statusEl.className = "text-[9px] bg-green-100 px-2 py-1 border border-green-500 font-black text-green-700 tracking-widest uppercase";
-            linkEl.classList.remove('hidden');
-            linkEl.innerHTML = `<a href="${result.url}" target="_blank" class="hover:underline font-bold text-indigo-700">View Live Deployment →</a>`;
             showToast(`${platform.toUpperCase()} Deployment Successful!`, 'success');
+            setTimeout(() => { window.location.href = 'dashboard.html'; }, 2000);
         } else {
-            throw new Error("API Rejected Payload");
+            throw new Error("Deployment rejected.");
         }
     } catch (e) {
-        statusEl.textContent = "FAILED";
-        statusEl.className = "text-[9px] bg-red-100 px-2 py-1 border border-red-500 font-black text-red-700 tracking-widest uppercase";
-        showToast(`${platform.toUpperCase()} Deployment Failed. Check API Keys.`, 'error');
+        showToast(`${platform.toUpperCase()} Deployment Failed.`, 'error');
     }
 }
 
-window.rejectPublish = function(platform) {
-    const statusEl = document.getElementById(`${platform}Status`);
-    if (statusEl) {
-        statusEl.textContent = "REJECTED";
-        statusEl.className = "text-[9px] bg-gray-100 px-2 py-1 border border-gray-400 font-black text-gray-500 tracking-widest uppercase";
-    }
-}
-
-// --- Dynamic Badge Generator ---
-window.resetPublishCards = function(initialState = "AWAITING") {
-    ['devto', 'hashnode'].forEach(platform => {
-        const statusEl = document.getElementById(`${platform}Status`);
-        const linkEl = document.getElementById(`${platform}Link`);
-        
-        if (statusEl) {
-            statusEl.textContent = initialState;
-            
-            if (initialState === "SCHEDULED") {
-                // Time-Travel Theme
-                statusEl.className = "text-[9px] bg-purple-100 px-2 py-1 border border-purple-500 font-black text-purple-700 tracking-widest uppercase";
-            } else {
-                // Default Theme
-                statusEl.className = "text-[9px] bg-yellow-100 px-2 py-1 border border-black font-black text-yellow-800 tracking-widest uppercase";
-            }
-        }
-        
-        if (linkEl) {
-            linkEl.classList.add('hidden');
-            linkEl.innerHTML = '';
-        }
-    });
-}
-
-// --- Updated Copy Function ---
-window.copySocial = function(elementId, e) { // <-- Added 'e' here
-    const text = document.getElementById(elementId).innerText;
-    
-    navigator.clipboard.writeText(text).then(() => {
-        showToast("Copied to clipboard!", "success");
-        
-        // Use the passed event 'e' instead of the global 'event'
-        if(e && e.target) {
-            const btn = e.target;
-            const originalText = btn.innerText;
-            btn.innerText = "COPIED";
-            
-            // Revert the text after 2 seconds
-            setTimeout(() => {
-                btn.innerText = originalText;
-            }, 2000);
-        }
-    }).catch(err => {
-        console.error('Failed to copy: ', err);
-        showToast("Copy failed!", "error");
-    });
-}
-
-// Social Promo Helpers
+// --- SOCIAL PROMO HELPERS ---
 window.revealSocialCards = function() {
-    const trigger = document.getElementById('promo-trigger');
+    document.getElementById('promo-trigger').classList.add('hidden');
     const cards = document.getElementById('promo-cards');
-    
-    if(trigger) trigger.classList.add('hidden');
-    if(cards) {
-        cards.classList.remove('hidden');
-        cards.classList.add('grid');
-        cards.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    cards.classList.remove('hidden');
+    cards.classList.add('grid');
+    cards.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-window.logoutUser = function() {
-    localStorage.removeItem('artifauctor_token');
-    window.location.href = 'auth.html';
+window.copySocial = function(elementId, e) {
+    const text = document.getElementById(elementId).innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        showToast("Copied!", "success");
+    });
 }

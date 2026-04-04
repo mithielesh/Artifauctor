@@ -1,4 +1,3 @@
-# backend/services/agents.py
 import logging
 import json
 from google import genai
@@ -10,20 +9,16 @@ def generate_seo_blog(keyword: str, serp_data: list, domain: str = "General", ap
     """
     The 'Brain' of the operation.
     Built on the google-genai SDK using the blazing fast Gemini 2.5 Flash model.
-    Upgraded to an Enterprise Deep-Read Generator with BYOK, Brand Voice, and Internal Linking.
+    Upgraded to an Enterprise Deep-Read Generator with BYOK, Brand Voice, and Semantic RAG-Lite.
     """
     logging.info(f"Initializing Enterprise AI Pipeline for domain: '{domain}'...")
     
-    # Defensive programming: crash early if the key is missing from the DB payload
     if not api_key:
         logging.error("API Key was not provided by the Router!")
         raise ValueError("Gemini API Key is required to run the pipeline. Check your Vault Settings.")
         
     try:
-        # Initialize the new GenAI client dynamically per user request!
         client = genai.Client(api_key=api_key)
-        
-        # Using the absolute latest high-speed model
         model_id = 'gemini-2.5-flash'
         
         # Step 1: Format the competitor data for the AI to read
@@ -48,9 +43,7 @@ def generate_seo_blog(keyword: str, serp_data: list, domain: str = "General", ap
         outline_response = client.models.generate_content(
             model=model_id,
             contents=strategist_prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.2, # Low temperature for logical, structured formatting
-            )
+            config=types.GenerateContentConfig(temperature=0.2)
         )
         outline = outline_response.text
         
@@ -64,21 +57,21 @@ def generate_seo_blog(keyword: str, serp_data: list, domain: str = "General", ap
             "{brand_voice}"
             """
 
-        # --- RAG-LITE INTERNAL LINKING INJECTION ---
+        # --- UPGRADED RAG-LITE INTERNAL LINKING INJECTION ---
         internal_linking_injection = ""
         if previous_links and len(previous_links) > 0:
-            links_context = "\n".join([f"- {link['keyword']}: {link['url']}" for link in previous_links])
+            # We now inject the SUMMARY of the past article, giving the AI true semantic context!
+            links_context = "\n".join([f"- Topic: {link['keyword']} | URL: {link['url']} | Context: {link.get('summary', 'Related article.')}" for link in previous_links])
             internal_linking_injection = f"""
             CRITICAL SEO REQUIREMENT (INTERNAL LINKING):
-            Here are some previously published articles from this author:
+            Here are some previously published articles from this author, along with what they are about:
             {links_context}
-            You MUST naturally weave exactly 1 or 2 of these links into the article text using standard Markdown hyperlink formatting. Do not force it, make it contextual.
+            You MUST naturally weave exactly 1 or 2 of these links into the article text using standard Markdown hyperlink formatting. 
+            Use the Context provided to make the transition into the link make logical sense. Do not force it.
             """
 
         # Step 3: Agent 2 - The Master Copywriter
         logging.info("Agent 2 (Writer) is drafting the content with Live Context...")
-        
-        # NOTE: Added {internal_linking_injection} right below brand_voice_injection
         writer_prompt = f"""
         You are a top-tier Senior Technical Writer specializing in the '{domain}' niche.
         Write a highly structured, authoritative Deep-Dive for the keyword '{keyword}'.
@@ -99,9 +92,8 @@ def generate_seo_blog(keyword: str, serp_data: list, domain: str = "General", ap
         3. Include ONE Markdown Table. The table MUST be fully completed with a header row, a separator row (e.g., |---|---|---|), and all data rows.
         4. Include realistic code snippets using ``` blocks if the domain is Technical.
         
-        CRITICAL COMPLETION RULES (DO NOT FAIL THESE):
+        CRITICAL COMPLETION RULES:
         - Target Length: Around 800 to 1200 words. 
-        - YOUR ABSOLUTE HIGHEST PRIORITY IS COMPLETING THE ARTICLE. 
         - NEVER stop generating mid-sentence, mid-paragraph, or mid-table.
         - You MUST complete the article by writing a final "## Final Thoughts" section that ends with a definitive concluding sentence.
         """
@@ -110,21 +102,38 @@ def generate_seo_blog(keyword: str, serp_data: list, domain: str = "General", ap
             model=model_id,
             contents=writer_prompt,
             config=types.GenerateContentConfig(
-                temperature=0.5, # Lowered from 0.7 to reduce rambling and hallucinations
+                temperature=0.5, 
                 max_output_tokens=8192
             )
         )
         final_blog = blog_response.text
+
+        # --- NEW: Step 4: Agent 3 - The RAG-Lite Summarizer ---
+        logging.info("Agent 3 (Summarizer) is compressing the draft for future RAG context...")
+        summary_prompt = f"""
+        Read the following blog post and summarize its core value proposition in exactly 5 concise sentences. 
+        This summary will be used to train an AI on what this article is about.
+        Do not use introductory phrases, just return the 5 sentences.
         
-        logging.info("Blog generation complete!")
+        BLOG CONTENT:
+        {final_blog[:4000]}...
+        """
+        summary_response = client.models.generate_content(
+            model='gemini-2.5-flash-lite', # Using lite for speed and lower cost
+            contents=summary_prompt,
+            config=types.GenerateContentConfig(temperature=0.3)
+        )
+        rag_summary = summary_response.text.strip()
+        
+        logging.info("Blog generation and Semantic RAG compression complete!")
         return {
             "outline": outline,
-            "blog_content": final_blog
+            "blog_content": final_blog,
+            "summary": rag_summary # Passed back to routes.py to save to DB!
         }
         
     except Exception as e:
         logging.error(f"Gemini AI Generation failed: {e}")
-        # Raising the exception here so routes.py can catch it and send a clean 500 error to the UI
         raise Exception(f"AI Pipeline Failed: {str(e)}")
 
 
@@ -169,13 +178,13 @@ def generate_socials(article_content: str, api_key: str) -> dict:
         logging.error(f"Social Generation failed: {e}")
         return {"twitter": "Failed to generate.", "linkedin": "Failed to generate."}
     
-def call_the_muse(user_input: str, api_key: str) -> str: # 1. Pass the api_key as an argument
+
+def call_the_muse(user_input: str, api_key: str) -> str:
     """The Muse: Neo-Brutalist Idea Bot using Gemini SDK"""
     if not api_key:
         return "NO KEY, NO SPARK. CHECK YOUR VAULT."
         
     try:
-        # 2. Use the same GenAI client pattern as your other functions
         client = genai.Client(api_key=api_key)
         model_id = 'gemini-2.5-flash-lite'
         
@@ -187,7 +196,6 @@ def call_the_muse(user_input: str, api_key: str) -> str: # 1. Pass the api_key a
             "Do not use markdown headers, just raw, powerful text."
         )
         
-        # 3. Use the correct .models.generate_content syntax for the Google SDK
         response = client.models.generate_content(
             model=model_id,
             contents=f"{system_prompt}\n\nUSER SIGNAL: {user_input}",
@@ -202,3 +210,54 @@ def call_the_muse(user_input: str, api_key: str) -> str: # 1. Pass the api_key a
     except Exception as e:
         logging.error(f"Idea Generation failed: {e}")
         return "THE SPARK HAS FLICKERED. TRY AGAIN."
+
+
+# --- MEGA UPDATE: THE STUDIO HITL EDITOR ---
+
+def apply_hitl_correction(current_content: str, instruction: str, api_key: str) -> str:
+    """
+    Agent 5: Human-In-The-Loop Editor. 
+    Takes the user's specific text commands and surgically updates the current draft.
+    """
+    if not api_key:
+        raise ValueError("API Key missing for HITL Correction.")
+        
+    try:
+        client = genai.Client(api_key=api_key)
+        # Using the heavy Flash model here because editing long markdown requires high reasoning
+        model_id = 'gemini-2.5-flash' 
+        
+        editor_prompt = f"""
+        You are an elite Senior Technical Editor.
+        Below is a draft of an article currently in progress.
+        
+        CURRENT DRAFT:
+        ---
+        {current_content}
+        ---
+        
+        THE INSTRUCTION FROM THE HEAD EDITOR:
+        "{instruction}"
+        
+        YOUR TASK:
+        Apply the Head Editor's instruction to the draft perfectly. 
+        - If they ask to rewrite a specific section, rewrite ONLY that section and keep the rest intact.
+        - If they ask to change the overall tone, rewrite the entire draft to match the new tone.
+        - DO NOT add conversational filler (e.g., "Here is the revised draft").
+        - Return ONLY the raw, updated Markdown text so it can seamlessly replace the old text in the user's editor.
+        """
+        
+        response = client.models.generate_content(
+            model=model_id,
+            contents=editor_prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.4, # Keep it relatively low to prevent wild hallucinated additions
+                max_output_tokens=8192
+            )
+        )
+        
+        return response.text.strip()
+        
+    except Exception as e:
+        logging.error(f"HITL Correction failed: {e}")
+        raise Exception("The Editor Agent failed to process your correction. Please try again.")

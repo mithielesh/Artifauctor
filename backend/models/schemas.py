@@ -3,39 +3,34 @@ from typing import Dict, Optional, List
 from datetime import datetime
 
 class BlogRequest(BaseModel):
+    workspace_name: str # <--- NEW: Requires a name before generation starts
     keyword: str
     domain: str = "General"
-    auto_publish: bool = False  # The frontend will toggle this to True when you click "Deploy"
     scheduled_for: Optional[datetime] = None
 
 class BlogResponse(BaseModel):
+    workspace_name: str
     keyword: str
     domain: str
     outline: str
     blog_content: str
+    summary: str # <--- NEW: Returning the RAG-Lite summary
     seo_score: int
-
-    # We default this to 0.0 because the ML Engine now uses 'naturalness' instead!
     keyword_density: Optional[float] = 0.0 
-    
     twitter_thread: Optional[str] = None
     linkedin_post: Optional[str] = None
     naturalness: int
     snippet_readiness: str
     readability_level: str
-    published_urls: Optional[Dict[str, str]] = {} # Will hold our Medium and Dev.to links
 
-# Add this to models/schemas.py
 class PublishRequest(BaseModel):
     title: str
     content: str
 
-# Data expected from the user when creating an account
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
 
-# Data we send back to the user (never send the password back!)
 class UserResponse(BaseModel):
     id: int
     email: str
@@ -47,12 +42,10 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# The JWT Token payload
 class Token(BaseModel):
     access_token: str
     token_type: str
 
-# Data expected when a user updates their settings (BYOK & Brand Voice)
 class UserUpdateSettings(BaseModel):
     gemini_key: Optional[str] = None
     devto_key: Optional[str] = None
@@ -60,27 +53,48 @@ class UserUpdateSettings(BaseModel):
     hashnode_pub_id: Optional[str] = None
     brand_voice: Optional[str] = None
 
-# Data sent back when fetching the Vault history
-class ArticleHistoryResponse(BaseModel):
+# --- MEGA UPDATE: WORKSPACE SCHEMAS ---
+
+class WorkspaceResponse(BaseModel):
     id: int
-    keyword: str
-    domain: str
+    workspace_name: str
+    keyword: Optional[str] = None
+    domain: Optional[str] = None
     status: str
-    scheduled_for: Optional[datetime] = None
+    summary: Optional[str] = None
+    
+    # --- THE AMNESIA FIX ---
+    content: Optional[str] = None 
     seo_score: Optional[float] = None
+    naturalness: Optional[int] = None 
+    readability_level: Optional[str] = None 
+    twitter_thread: Optional[str] = None 
+    linkedin_post: Optional[str] = None 
+    
+    scheduled_for: Optional[datetime] = None
     devto_url: Optional[str] = None
     hashnode_url: Optional[str] = None
     created_at: datetime
+    last_edited: datetime 
     
     class Config:
         from_attributes = True
+
+class WorkspaceSaveRequest(BaseModel):
+    """Used for the background auto-save loop in the Studio"""
+    content: str
+
+class CorrectionRequest(BaseModel):
+    """Used for the Human-in-the-Loop AI Editor"""
+    instruction: str
+    current_content: str
+
+# --- IDEA BOT & NOTES SCHEMAS ---
 
 class NoteRequest(BaseModel):
     title: str
     content: str
     is_bulleted: bool
-
-# --- THE MUSE SCHEMAS ---
 
 class MuseRequest(BaseModel):
     message: str

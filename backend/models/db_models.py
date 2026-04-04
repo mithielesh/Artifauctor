@@ -1,5 +1,4 @@
-# backend/models/db_models.py
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Date, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Date, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone, date
 from database import Base
@@ -22,36 +21,53 @@ class User(Base):
     
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-    # Relationship to link users to their generated articles
-    articles = relationship("ArticleHistory", back_populates="owner")
+    # Relationship to link users to their workspaces
+    workspaces = relationship("Workspace", back_populates="owner")
 
 
-class ArticleHistory(Base):
-    __tablename__ = "article_history"
+class Workspace(Base):
+    __tablename__ = "workspaces"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
+    
+    # --- MEGA UPDATE: Workspace Identity ---
+    workspace_name = Column(String, nullable=False)
+    status = Column(String, default="Drafting") # "Drafting", "Generating", "Scheduled", "Published"
+    summary = Column(Text, nullable=True) # <-- New RAG-Lite Context Engine
+    
     keyword = Column(String)
     domain = Column(String)
     content = Column(Text)
+    
+    # --- ML METRICS (Amnesia Fix) ---
     seo_score = Column(Float)
-    status = Column(String) # "Draft", "Published", or "Scheduled"
+    naturalness = Column(Integer, nullable=True)
+    readability_level = Column(String, nullable=True)
     
     # --- INDEPENDENT URL TRACKING ---
     devto_url = Column(String, nullable=True)
     hashnode_url = Column(String, nullable=True)
     
-    # --- NEW COLUMNS FOR STAGE 2 (Socials & Scheduling) ---
+    # --- SOCIALS & SCHEDULING ---
     scheduled_for = Column(DateTime, nullable=True)
     target_platform = Column(String, nullable=True) 
     twitter_thread = Column(Text, nullable=True)
     linkedin_post = Column(Text, nullable=True)
     
-    # FIX: Changed server_default to default with a lambda
+    # --- TIME TRACKING ---
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    # onupdate automatically refreshes this timestamp whenever the row is modified!
+    last_edited = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationship back to the user
-    owner = relationship("User", back_populates="articles")
+    owner = relationship("User", back_populates="workspaces")
+
+    # Ensure workspace names are unique PER USER, but allow different users to use the same name
+    __table_args__ = (
+        UniqueConstraint('user_id', 'workspace_name', name='_user_workspace_uc'),
+    )
+
 
 class AnalyticsHistory(Base):
     """Stores daily snapshots of Dev.to and Hashnode performance."""
@@ -60,19 +76,18 @@ class AnalyticsHistory(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     
-    # Use date.today directly!
     recorded_date = Column(Date, default=date.today) 
-    
     total_views = Column(Integer, default=0)
     total_likes = Column(Integer, default=0)
     total_comments = Column(Integer, default=0)
+
 
 class IdeaNote(Base):
     __tablename__ = "idea_notes"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    title = Column(String, default="Untitled") # <--- NEW
+    title = Column(String, default="Untitled") 
     content = Column(String)
     is_bulleted = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)
