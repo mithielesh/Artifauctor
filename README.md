@@ -1,4 +1,4 @@
-# Artifauctor - Autonomous Content Pipeline v2.0
+﻿# Artifauctor - Autonomous Content Studio v3.0
 
 [![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -9,79 +9,84 @@
 [![GraphQL](https://img.shields.io/badge/GraphQL-E10098?style=flat-square&logo=graphql&logoColor=white)](https://graphql.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-07405E?style=flat-square&logo=sqlite&logoColor=white)](https://sqlite.org/)
 
-An enterprise-grade, multi-agent AI SEO engine that researches, drafts, validates, and autonomously deploys high-ranking content. **Version 2.0** introduces Hybrid ML Semantic Validation, Asynchronous Auto-Deployment, and a multi-tenant User Vault.
+An enterprise-grade, multi-tenant AI Content Management System (CMS) that researches, drafts, validates, and autonomously deploys high-ranking SEO content. **Version 3.0** transitions the engine into a full-scale SaaS platform, featuring a Neo-Brutalist collaborative Studio, a real-time AI Co-Editor, Asynchronous Auto-Save, and an Immutable Artifact Vault.
 
-## System Architecture (v2.0)
+## System Architecture (v3.0)
 
 ```mermaid
-flowchart LR
+flowchart TD
     %% Styling
     classDef input fill:#f3f0ff,stroke:#1f2937,stroke-width:2px,color:#111827
     classDef agent fill:#818cf8,stroke:#1f2937,stroke-width:2px,color:#fff
-    classDef external fill:#1f2937,stroke:#fff,stroke-width:2px,color:#fff
-    classDef deploy fill:#10b981,stroke:#1f2937,stroke-width:2px,color:#fff
     classDef db fill:#f59e0b,stroke:#1f2937,stroke-width:2px,color:#fff
+    classDef ui fill:#86efac,stroke:#1f2937,stroke-width:2px,color:#111827
+    classDef deploy fill:#10b981,stroke:#1f2937,stroke-width:2px,color:#fff
 
-    %% Flow
-    User([User Input / Auth]) --> API{FastAPI Engine}
+    User([Creator / BYOK Auth]) --> API{FastAPI Core}
     
-    %% DB & Research Phase
-    API <-->|RAG-Lite Links| Vault[(SQLite DB)]
-    API -->|1. Keyword| Scraper[Tavily Scraper]
-    Scraper -.->|Live SERP Data| API
+    %% The Multi-Agent Pipeline
+    subgraph Pipeline [The Agentic Pipeline]
+        API -->|SERP Data| Strat[Strategist Agent]
+        Strat --> Writer[Master Writer Agent]
+        Writer --> Social[Social Architect]
+        Social --> Val[ML Validator / Scorer]
+    end
     
-    %% Multi-Agent Pipeline
-    API -->|2. Context| Strat[Agent 1: Strategist]
-    Strat -->|Outline| Writer[Agent 2: Writer]
-    Writer -->|Draft| Social[Agent 3: Social Architect]
-    Social -->|Post & Thread| Val[Agent 4: ML Validator]
+    %% The UI State
+    subgraph Frontend [The Neo-Brutalist UI]
+        Board[Active Workspaces Kanban]
+        Studio[The Studio Canvas]
+        VaultUI[The Vault]
+    end
+
+    %% State Management
+    Val -->|Draft Data| Board
+    Board <--> Studio
+    Studio <-->|5s Auto-Save Loop| DB[(SQLite Database)]
+    Studio <-->|HITL Instruction| CoEditor[AI Co-Editor]
     
-    %% HITL & Background Tasks
-    Val -->|Draft Saved| UI[Neo-Brutalist UI]
-    UI --> App{Action}
-    App -->|Approve Now| Publish
-    App -->|Schedule| Worker((APScheduler))
-    Worker -.->|CRON Trigger| Publish
+    %% Deployment & Scheduler
+    Studio -->|Publish Now| DeployEngine
+    DB -.->|CRON Interval| Scheduler((APScheduler))
+    Scheduler -->|Timezone-Aware| DeployEngine
     
-    %% Publishing
-    Publish --> DevTo[Dev.to API]
-    Publish --> Hash[Hashnode API]
+    DeployEngine --> DevTo[Dev.to API]
+    DeployEngine --> Hash[Hashnode API]
+    DeployEngine -->|State: Immutable| VaultUI
 
     %% Apply Classes
-    class User,UI input;
-    class Strat,Writer,Social,Val agent;
-    class Scraper external;
-    class DevTo,Hash deploy;
-    class Vault,Worker db;
+    class User input;
+    class Strat,Writer,Social,Val,CoEditor agent;
+    class Board,Studio,VaultUI ui;
+    class DeployEngine,DevTo,Hash deploy;
+    class DB,Scheduler db;
 ```
 
-## Core Features
+## Core Features (v3.0 Upgrades)
 
-### Multi-Agent AI Pipeline
-- **Strategist Agent:** Analyzes live SERP gaps to create hyper-targeted, domain-specific outlines.
-- **Master Writer Agent:** Drafts 1,000+ word deep-dives using the PAS framework (Problem-Agitate-Solution) with code snippets and Markdown tables.
-- **Validator Agent:** Runs local heuristic scoring for SEO performance, naturalness, keyword density, and snippet readiness.
+### The Studio & Active Board
+- **Author Note Taking:** Integrated note taking feature for authors.
+- **The Editor Canvas:** A distraction-free workspace featuring a live Markdown-to-HTML rendering toggle.
+- **Asynchronous Auto-Save:** A silent background thread syncs canvas keystrokes to the database every 5 seconds, ensuring zero data loss.
+- **The Kill Switch:** A secure, permanent workspace purge protocol.
 
-### Asynchronous Publishing Engine
-- **Auto-Deploy Scheduler:** Built with apscheduler. Users can draft content and set future deployment timestamps. A background worker silently monitors the queue and auto-publishes to external platforms exactly on time.
-- **RAG-Lite Internal Linking:** The engine autonomously pulls a user's previously published URLs from the database and injects them into the Writer Agent's context window for dynamic SEO backlinking.
+### AI Co-Editor (Human-In-The-Loop)
+- **Interactive Editing:** Users are no longer restricted to the initial AI generation. The Studio features an integrated AI Co-Editor that accepts natural language instructions (e.g., "Make the intro punchier and add a section about Docker") to rewrite specific canvas elements on the fly.
+- **The Muse:** A globally accessible, chat-based brainstorming agent built directly into the UI to help creators ideate before launching a pipeline.
 
-### The Vault (Multi-Tenant Auth)
-- **Stateless JWT Security:** Full user authentication allowing multiple users to operate their own pipelines.
-- **Bring Your Own Key (BYOK):** Users store their own Gemini API keys securely in the DB, ensuring zero liability for public hosting.
+### The Vault (Immutable CMS)
+- **Immutable Artifacts:** Once an article is deployed (manually or via the scheduler), it is locked into "The Vault" as an Immutable Artifact.
+- **Cross-Platform Syndication:** Deploy a published Hashnode article directly to Dev.to with one click without leaving the Vault.
+- **Project Cloning:** Instantly duplicate a successful historical artifact back into the Active Board for a Version 2 rewrite.
 
-### Social Architect (Agent 3)
-- **Content Syndication:** Automatically spins off the 1,000+ word blog draft into a highly-engaging LinkedIn post and a viral Twitter/X Thread, ready for 1-click clipboard copying.
+### Multi-Agent AI Generation
+- **Strategist Agent:** Analyzes live SERP gaps via Tavily to create hyper-targeted outlines.
+- **Master Writer Agent:** Drafts 1,000+ word deep-dives with Markdown tables and code snippets.
+- **Social Architect:** Spins the final draft into high-converting LinkedIn posts and X/Twitter threads.
+- **Hybrid ML Validator:** Runs semantic cosine similarity (HuggingFace) and readability heuristics to generate SEO and "Humanness" scores, which are now permanently stored in the database.
 
-### Hybrid ML Validator (Agent 4)
-- **Upgraded Heuristics:** Transitions from basic heuristics to a local Machine Learning pipeline.
-- **Semantic Cosine Similarity:** Uses Hugging Face's all-MiniLM-L6-v2 via sentence-transformers to guarantee the generated content semantically matches the target keyword.
-- **Human-Proxy Scoring:** Calculates Flesch Reading Ease and sentence-length variance (burstiness) to ensure high "Naturalness" and avoid AI-content detectors.
-
-### Human-in-the-Loop (HITL) Deployment
-- **Staging Dashboard:** Holds generated content in a pending state for editorial review.
-- **One-Click Publishing:** Transforms approved drafts into live articles on Dev.to and Hashnode instantly.
-- **BYOK Architecture:** Designed to support "Bring Your Own Key" for stateless, zero-liability public hosting.
+### Timezone-Aware Auto-Deployment
+- **Smart Scheduling:** Set local browser deployment times; the engine autonomously normalizes to UTC and publishes to external platforms while the user is offline via apscheduler.
 
 ## Technology Stack
 
@@ -102,16 +107,23 @@ flowchart LR
 
 ## Major API Overview
 
-### AI Generation (/api/v1)
+### Generation & Editing (/api/v1)
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/generate` | POST | Triggers SERP scraper and full multi-agent generation pipeline. Returns content & SEO metrics. |
+| `/generate` | POST | Triggers SERP scraper and full multi-agent pipeline. Initializes a new Workspace. |
+| `/workspaces/active` | GET | Fetches all mutable drafts and scheduled workspaces for the Kanban board. |
+| `/workspaces/{id}/save` | PUT | The 5-second auto-save bridge for the canvas text. |
+| `/workspaces/{id}/correct` | POST | Triggers the AI Co-Editor to rewrite canvas content based on user instructions. |
+| `/muse` | POST | Communicates with the global brainstorming AI assistant. |
+| `/workspaces/{id}` | DELETE | The Kill Switch. Permanently purges a draft from the database. |
 
-### HITL Deployment (/api/v1/publish)
+### The Vault & Publishing (/api/v1)
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/publish/devto` | POST | Pushes approved Markdown payload to Dev.to via REST API. Returns live URL. |
-| `/publish/hashnode` | POST | Pushes approved Markdown payload to Hashnode via GraphQL. Returns live URL. |
+| `/workspaces/vault` | GET | Fetches all immutable, published artifacts. |
+| `/workspaces/{id}/clone` | POST | Duplicates a Vault artifact into a fresh Active Workspace. |
+| `/publish/{platform}/{id}` | POST | Deploys an Active draft to Dev.to or Hashnode and moves it to the Vault. |
+| `/publish/vault/{id}/{platform}` | POST | Cross-publishes an already immutable artifact to a secondary platform. |
 
 ## License
 
