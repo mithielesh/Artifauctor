@@ -220,7 +220,7 @@ function initializeStudio(name, content, seo, naturalness, twitter, linkedin, su
     
     document.getElementById('outlineOutput').innerHTML = `
         <div class="bg-indigo-50 border border-indigo-200 p-3 text-indigo-900 font-medium shadow-[2px_2px_0px_#1f2937]">
-            <span class="block text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-1">RAG-Lite Summary</span>
+            <span class="block text-[10px] font-black uppercase tracking-widest text-indigo-500 mb-1">Summarizer</span>
             ${summary || "No context summary generated."}
         </div>
     `;
