@@ -101,3 +101,10 @@ class MuseRequest(BaseModel):
 
 class MuseResponse(BaseModel):
     reply: str
+
+class AutocompleteRequest(BaseModel):
+    prefix: str
+
+class CorrectionRequest(BaseModel):
+    instruction: str
+    current_content: str

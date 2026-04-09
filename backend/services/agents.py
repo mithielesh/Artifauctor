@@ -137,8 +137,8 @@ def generate_seo_blog(keyword: str, serp_data: list, domain: str = "General", ap
         raise Exception(f"AI Pipeline Failed: {str(e)}")
 
 
-def generate_socials(article_content: str, api_key: str) -> dict:
-    """Agent 4: Takes a finished article and derives viral social media copy."""
+def generate_socials(summary: str, api_key: str) -> dict:
+    """Agent 4: Takes the RAG summary and derives viral social media copy."""
     if not api_key:
         return {"twitter": "", "linkedin": ""}
         
@@ -148,13 +148,14 @@ def generate_socials(article_content: str, api_key: str) -> dict:
         
         social_prompt = f"""
         You are an elite Social Media Ghostwriter. 
-        The author just published a blog titled: "{article_content[:100]}..."
+        The author just published a new deep-dive blog. Here is the core summary of the article:
+        "{summary}"
         
         TASK:
-        1. Write a viral X (Twitter) "Announcement" tweet. It must include a powerful hook, a brief value prop, and a placeholder [INSERT LINK HERE]. Use emojis.
-        2. Write a professional LinkedIn "Published" post. Focus on the 'Why it matters' for the industry and end with "Read the full deep-dive here: [INSERT LINK HERE]".
+        1. Write a viral X (Twitter) "Announcement" tweet. It must include a powerful hook based on the summary, a brief value prop, and a placeholder [INSERT LINK HERE]. Use emojis.
+        2. Write a professional LinkedIn "Published" post. Focus on 'Why it matters' for the industry based on the summary, and end with "Read the full deep-dive here: [INSERT LINK HERE]".
         
-        Keep them SHORT and PUNCHY. Do not summarize the whole blog.
+        Keep them SHORT and PUNCHY. Do not just repeat the summary. Write engaging social copy.
         
         STRICT JSON FORMAT:
         {{
@@ -261,3 +262,50 @@ def apply_hitl_correction(current_content: str, instruction: str, api_key: str) 
     except Exception as e:
         logging.error(f"HITL Correction failed: {e}")
         raise Exception("The Editor Agent failed to process your correction. Please try again.")
+    
+def generate_autocomplete(prefix_text: str, api_key: str) -> str:
+    """Agent 6: Ghost Text with Anti-Loop Logic."""
+    if not api_key: return ""
+    try:
+        client = genai.Client(api_key=api_key)
+        # UPDATED TO LITE
+        model_id = 'gemini-2.5-flash-lite' 
+        
+        prompt = f"""
+        Continue the following technical text. 
+        CRITICAL: Do not repeat any sentences or phrases already present in the text below.
+        Provide a fresh continuation that flows naturally.
+        
+        LIMIT: 10-15 words only.
+        
+        TEXT:
+        "{prefix_text}"
+        
+        CONTINUATION:"""
+
+        response = client.models.generate_content(
+            model=model_id,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.7, # Higher temp prevents repetitive loops
+                max_output_tokens=40
+            )
+        )
+        return response.text.strip().replace('"', '')
+    except Exception as e:
+        print(f"Autocomplete Error: {e}")
+        return ""
+
+def correct_content(instruction: str, current_content: str, api_key: str) -> str:
+    """Agent 2: In-line surgical editing."""
+    try:
+        client = genai.Client(api_key=api_key)
+        model_id = 'gemini-2.5-flash-lite' # Ensure Lite is used here too
+        
+        prompt = f"Instruction: {instruction}\n\nContent to edit: {current_content}\n\nProvide only the revised text:"
+        
+        response = client.models.generate_content(model=model_id, contents=prompt)
+        return response.text.strip()
+    except Exception as e:
+        print(f"Correction Error: {e}")
+        raise e # This helps you see the error in your FastAPI logs

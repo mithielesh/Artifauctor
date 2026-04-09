@@ -13,7 +13,7 @@ from auth_utils import get_current_user
 
 # Existing services
 from services.serp_scraper import fetch_top_serp_results
-from services.agents import generate_seo_blog, generate_socials, call_the_muse, apply_hitl_correction
+from services.agents import generate_seo_blog, generate_socials, call_the_muse, apply_hitl_correction, generate_autocomplete, correct_content
 from services.validator import calculate_seo_score, calculate_humanness_score
 from services.publisher import publish_to_devto, publish_to_hashnode
 
@@ -80,7 +80,7 @@ async def generate_blog_endpoint(
             raise HTTPException(status_code=500, detail="AI Generation Failed.")
 
         # --- AGENT 4 - SOCIAL MEDIA SPINOFFS ---
-        socials = generate_socials(ai_result["blog_content"], current_user.gemini_key)
+        socials = generate_socials(ai_result["summary"], current_user.gemini_key)
             
         # 4. THE JUDGE: ML HYBRID VALIDATOR
         seo_score = calculate_seo_score(ai_result["blog_content"], request.keyword, request.domain)
@@ -414,3 +414,45 @@ async def delete_workspace(
     db.delete(ws)
     db.commit()
     return {"status": "deleted", "message": f"Workspace '{ws.workspace_name}' destroyed."}
+
+@router.post("/workspaces/{workspace_id}/autocomplete")
+async def autocomplete_text(
+    workspace_id: int, 
+    request: schemas.AutocompleteRequest, 
+    db: Session = Depends(get_db),
+    current_user: db_models.User = Depends(get_current_user)
+):
+    """The Ghost Text API endpoint (Sprint 3)"""
+    # Grab the user's API key directly from your auth model
+    api_key = current_user.gemini_key
+    
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Gemini API Key missing in Settings.")
+        
+    try:
+        continuation = generate_autocomplete(request.prefix, api_key)
+        return {"continuation": " " + continuation} # Add a space so it flows naturally
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/workspaces/{workspace_id}/correct")
+async def apply_correction(
+    workspace_id: int, 
+    request: schemas.CorrectionRequest, 
+    current_user = Depends(get_current_user)
+):
+    try:
+        api_key = current_user.gemini_key 
+        
+        # 2. Call the Agent logic we just updated
+        revised_text = correct_content(
+            instruction=request.instruction, 
+            current_content=request.current_content, 
+            api_key=api_key
+        )
+        
+        return {"content": revised_text}
+    
+    except Exception as e:
+        print(f"Server Error in Correction: {e}")
+        raise HTTPException(status_code=500, detail="The AI failed to revise the snippet.")

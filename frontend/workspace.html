@@ -82,26 +82,42 @@
         .metric-label { font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #555; letter-spacing: 0.05em; }
         .metric-value { font-family: 'JetBrains Mono'; font-size: 1.5rem; font-weight: 700; color: var(--text-dark); margin-top: 0.25rem; }
 
-        /* The Studio Editor Canvas */
+        /* --- UPGRADED EDITOR CANVAS FOR SPRINTS 2 & 3 --- */
         #editorCanvas {
             width: 100%;
-            /* Height removed so flex-1 can stretch it to the bottom of the screen! */
+            height: 1000px; /* Solid starting height */
+            max-height: 85vh; /* STRICT BOUNDARY for the scrollbar */
+            overflow-y: auto !important; /* FORCE the internal scrollbar */
+            resize: vertical; /* Drag-to-resize */
             padding: 2rem;
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.95rem;
             line-height: 1.7;
-            resize: vertical;
             border: 3px solid var(--border-dark);
             box-shadow: var(--shadow-md);
             background: var(--bg-card);
             outline: none;
+            white-space: pre-wrap; /* Keeps markdown spacing intact */
+            position: relative;
         }
+        #editorCanvas:empty:before { content: attr(data-placeholder); color: #9ca3af; pointer-events: none; }
         #editorCanvas:focus { box-shadow: 7px 7px 0px var(--border-dark); transform: translate(-2px, -2px); }
+        
+        /* Ghost Text Styling */
+        .ghost-text {
+            color: #9ca3af;
+            font-style: italic;
+            pointer-events: none;
+            user-select: none;
+        }
 
         /* The Rendered Preview Canvas */
         #previewCanvas {
             border: 3px solid var(--border-dark);
             box-shadow: var(--shadow-md);
+            height: 75vh; /* THE FIX: Match the editor's hard boundary */
+            min-height: 500px;
+            overflow-y: auto; /* THE FIX: Internal scrollbar for long tables */
         }
         
         /* Prose Styles for the Preview */
@@ -181,13 +197,11 @@
         <div id="setupView" class="p-10 max-w-5xl">
             <div class="bg-white border-2 border-dark shadow-[6px_6px_0px_#1f2937] p-8">
                 <h3 class="text-xl font-black mb-6 border-b-2 border-dark pb-4">Initialize Project Parameters</h3>
-                
                 <div class="space-y-6">
                     <div>
                         <label class="metric-label mb-2 block">Unique Workspace Name <span class="text-red-500">*</span></label>
                         <input type="text" id="wsNameInput" placeholder="e.g. React Hooks Deep Dive v1" class="input-box w-full px-4 h-[56px] outline-none mono text-sm">
                     </div>
-
                     <div class="flex flex-col md:flex-row gap-6">
                         <div class="flex-1">
                             <label class="metric-label mb-2 block">Target Keyword <span class="text-red-500">*</span></label>
@@ -202,32 +216,21 @@
                             </select>
                         </div>
                     </div>
-
-                    <div>
-                        <label class="metric-label mb-2 block">Schedule Publishing (Optional)</label>
-                        <input type="datetime-local" id="scheduleInput" class="input-box w-full md:w-1/2 px-4 h-[56px] outline-none mono text-sm">
-                    </div>
-
-                    <button id="generateBtn" class="btn-primary w-full h-[60px] text-lg mt-4">
-                        Generate Base Draft
-                    </button>
+                    <button id="generateBtn" class="btn-primary w-full h-[60px] text-lg mt-4">Generate Base Draft</button>
                 </div>
             </div>
         </div>
 
         <div id="loadingState" class="hidden p-24 flex flex-col items-center justify-center min-h-[60vh]">
             <div class="agent-loader">
-                <div class="agent-block"></div>
-                <div class="agent-block"></div>
-                <div class="agent-block"></div>
+                <div class="agent-block"></div><div class="agent-block"></div><div class="agent-block"></div>
             </div>
             <div class="mono text-sm tracking-widest uppercase font-bold text-gray-800" id="loadingText">Analyzing live SERP data...</div>
-            <div class="mt-4 text-xs text-gray-500 mono bg-white px-4 py-2 border border-gray-200">Executing Artifauctor Pipeline</div>
         </div>
 
         <div id="studioView" class="hidden flex flex-col xl:flex-row border-t-2 border-dark min-h-screen">
             
-            <div class="flex-1 p-8 bg-white border-r-2 border-dark flex flex-col">
+            <div class="flex-1 p-8 bg-white border-r-2 border-dark flex flex-col relative" id="canvasContainer">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="font-black uppercase tracking-widest text-sm">The Canvas</h3>
                     <div class="flex gap-2">
@@ -236,30 +239,28 @@
                     </div>
                 </div>
                 
-                <textarea id="editorCanvas" class="flex-1" spellcheck="false" placeholder="Your generated content will appear here..."></textarea>
+                <div id="floatingToolbar" class="hidden absolute z-50 bg-[#eef2ff] border-2 border-dark shadow-[4px_4px_0px_#1f2937] p-2 flex gap-2 items-center rounded flex-row w-[350px] transition-opacity">
+                    <input type="text" id="floatingInstruction" placeholder="Ask AI to rewrite this..." class="flex-1 outline-none text-sm mono px-2 py-1 bg-white border border-gray-300">
+                    <button id="floatingApplyBtn" class="bg-indigo-500 text-white font-bold uppercase text-[10px] px-3 py-2 hover:bg-indigo-600 transition-all">Run</button>
+                </div>
+
+                <div id="editorCanvas" class="flex-1" contenteditable="true" spellcheck="false" data-placeholder="Your generated content will appear here..."></div>
                 
                 <div id="previewCanvas" class="hidden flex-1 prose bg-gray-50 p-8 overflow-y-auto w-full"></div>
             </div>
 
             <div id="rightControlPanel" class="w-full xl:w-[450px] bg-gray-50 flex flex-col">
-                
                 <div class="grid grid-cols-2 border-b-2 border-dark">
-                    <div class="p-4 border-r-2 border-dark bg-white">
-                        <div class="metric-label">SEO Score</div>
-                        <div id="uiSeoScore" class="metric-value">--</div>
-                    </div>
-                    <div class="p-4 bg-white">
-                        <div class="metric-label">Humanness</div>
-                        <div id="uiNaturalness" class="metric-value text-indigo-600">--</div>
-                    </div>
+                    <div class="p-4 border-r-2 border-dark bg-white"><div class="metric-label">SEO Score</div><div id="uiSeoScore" class="metric-value">--</div></div>
+                    <div class="p-4 bg-white"><div class="metric-label">Humanness</div><div id="uiNaturalness" class="metric-value text-indigo-600">--</div></div>
                 </div>
 
                 <div class="p-6 border-b-2 border-dark flex-1">
                     <div class="flex items-center gap-2 mb-4">
-                        <h3 class="font-black uppercase tracking-widest text-sm">AI Co-Editor</h3>
+                        <h3 class="font-black uppercase tracking-widest text-sm">Global Co-Editor</h3>
                     </div>
                     <div class="bg-indigo-50 border-2 border-dark p-4 shadow-[4px_4px_0px_#1f2937] mb-4">
-                        <p class="text-xs font-bold text-gray-600 mb-2">Give the AI specific instructions to rewrite the current canvas text.</p>
+                        <p class="text-xs font-bold text-gray-600 mb-2">Give the AI specific instructions to rewrite the entire canvas text.</p>
                         <textarea id="correctionInput" class="w-full border-2 border-dark p-2 text-sm mono h-24 resize-none outline-none focus:bg-white" placeholder="e.g. Make the intro punchier and add a section about Docker..."></textarea>
                         <button id="applyCorrectionBtn" class="btn-primary w-full py-2 mt-2 text-xs">Apply Correction</button>
                     </div>
@@ -267,19 +268,13 @@
 
                 <div class="p-6 bg-[#eef2ff]">
                     <h3 class="metric-label text-indigo-800 mb-4">Deployment Engine</h3>
-                    
                     <div class="space-y-4">
                         <div class="bg-white border-2 border-dark p-4 shadow-[3px_3px_0px_#1f2937]">
-                            <div class="flex justify-between items-center mb-3">
-                                <span class="mono text-xs font-bold uppercase">Dev.to</span>
-                            </div>
+                            <div class="flex justify-between items-center mb-3"><span class="mono text-xs font-bold uppercase">Dev.to</span></div>
                             <button onclick="approvePublish('devto')" class="w-full bg-indigo-500 text-white border-2 border-dark text-[11px] font-bold py-2 uppercase hover:bg-indigo-600 transition-all">Publish Now</button>
                         </div>
-
                         <div class="bg-white border-2 border-dark p-4 shadow-[3px_3px_0px_#1f2937]">
-                            <div class="flex justify-between items-center mb-3">
-                                <span class="mono text-xs font-bold uppercase">Hashnode</span>
-                            </div>
+                            <div class="flex justify-between items-center mb-3"><span class="mono text-xs font-bold uppercase">Hashnode</span></div>
                             <button onclick="approvePublish('hashnode')" class="w-full bg-indigo-500 text-white border-2 border-dark text-[11px] font-bold py-2 uppercase hover:bg-indigo-600 transition-all">Publish Now</button>
                         </div>
                     </div>
@@ -289,28 +284,12 @@
 
         <div id="social-container" class="hidden p-10 bg-gray-50 border-t-2 border-dark">
             <div id="promo-trigger" class="input-box p-6 flex justify-between items-center bg-white">
-                <div>
-                    <h3 class="text-xl font-bold tracking-tight">Generate Promo Socials</h3>
-                    <p class="text-xs text-gray-500 mono uppercase tracking-widest mt-1">Extract hooks from the final draft</p>
-                </div>
+                <div><h3 class="text-xl font-bold tracking-tight">Generate Promo Socials</h3><p class="text-xs text-gray-500 mono uppercase tracking-widest mt-1">Extract hooks from the final draft</p></div>
                 <button onclick="revealSocialCards()" class="btn-primary py-3 px-6 text-xs">Generate</button>
             </div>
-            
             <div id="promo-cards" class="hidden mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="bg-white p-6 border-2 border-dark shadow-[4px_4px_0px_#1f2937]">
-                    <div class="flex justify-between items-center mb-4 border-b-2 border-gray-100 pb-2">
-                        <span class="metric-label text-blue-700">X Hook</span>
-                        <button onclick="copySocial('twitter-text')" class="bg-gray-100 border border-dark px-3 py-1 text-[10px] font-bold uppercase">Copy</button>
-                    </div>
-                    <div id="twitter-text" class="text-sm text-gray-800 leading-relaxed italic mono"></div>
-                </div>
-                <div class="bg-white p-6 border-2 border-dark shadow-[4px_4px_0px_#1f2937]">
-                    <div class="flex justify-between items-center mb-4 border-b-2 border-gray-100 pb-2">
-                        <span class="metric-label text-indigo-700">LinkedIn Post</span>
-                        <button onclick="copySocial('linkedin-text')" class="bg-gray-100 border border-dark px-3 py-1 text-[10px] font-bold uppercase">Copy</button>
-                    </div>
-                    <div id="linkedin-text" class="text-sm text-gray-800 leading-relaxed"></div>
-                </div>
+                <div class="bg-white p-6 border-2 border-dark shadow-[4px_4px_0px_#1f2937]"><div class="flex justify-between items-center mb-4 border-b-2 border-gray-100 pb-2"><span class="metric-label text-blue-700">X Hook</span><button onclick="copySocial('twitter-text')" class="bg-gray-100 border border-dark px-3 py-1 text-[10px] font-bold uppercase">Copy</button></div><div id="twitter-text" class="text-sm text-gray-800 leading-relaxed italic mono"></div></div>
+                <div class="bg-white p-6 border-2 border-dark shadow-[4px_4px_0px_#1f2937]"><div class="flex justify-between items-center mb-4 border-b-2 border-gray-100 pb-2"><span class="metric-label text-indigo-700">LinkedIn Post</span><button onclick="copySocial('linkedin-text')" class="bg-gray-100 border border-dark px-3 py-1 text-[10px] font-bold uppercase">Copy</button></div><div id="linkedin-text" class="text-sm text-gray-800 leading-relaxed"></div></div>
             </div>
         </div>
     </main>
