@@ -10,7 +10,7 @@
 [![GraphQL](https://img.shields.io/badge/GraphQL-E10098?style=flat-square&logo=graphql&logoColor=white)](https://graphql.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-07405E?style=flat-square&logo=sqlite&logoColor=white)](https://sqlite.org/)
 
-A multi-tenant AI Content Management System (CMS) that researches, drafts, validates, and autonomously deploys high-ranking SEO content. **Version 3.0** transitions the engine into a full-scale SaaS platform, featuring a Neo-Brutalist collaborative Studio, a real-time AI Co-Editor, Asynchronous Auto-Save, and an Immutable Artifact Vault.
+An AI Content Management System (CMS) that researches, drafts, validates, and autonomously deploys high-ranking SEO content. It features a collaborative Studio, a real-time AI Co-Editor, scheduled blog auto publishing, asynchronous Auto-Save, options to generate multiple versions of the draft, an idea chatbot, writer's  notes and analytics, and an Artifact Vault to view published blogs.
 
 ## System Architecture (v3.0)
 
